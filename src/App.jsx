@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { LayoutDashboard, School, UsersRound, BookOpen, UploadCloud, History, ChevronDown, ArrowUpRight, ArrowRight, Search, Bell, Download, Plus, Check, X, CheckCircle2, AlertTriangle, Building2, SlidersHorizontal, FileSpreadsheet, FileText, Pencil, RotateCcw, ShieldCheck, CircleHelp, ArrowLeft, GraduationCap, Sprout, Layers, Clock3, Menu, BriefcaseBusiness, TrendingUp, Bot, Send } from 'lucide-react';
+import { LayoutDashboard, School, UsersRound, BookOpen, UploadCloud, History, ChevronDown, ChevronUp, ArrowUpRight, ArrowRight, Search, Bell, Download, Plus, Check, X, CheckCircle2, AlertTriangle, Building2, SlidersHorizontal, FileSpreadsheet, FileText, Pencil, RotateCcw, ShieldCheck, CircleHelp, ArrowLeft, GraduationCap, Sprout, Layers, Clock3, Menu, BriefcaseBusiness, TrendingUp, Bot, Send, Minus, Maximize2, Minimize2 } from 'lucide-react';
 import { MODALITIES, STORAGE_KEY, fmt, round, capacityPedagogical, teacherCheck, summarizeSchool, createSeed, serializeCSV, parseCSV, validateImport, applyImport, sampleImport } from './core.mjs';
 
 const NAV = [ ['overview', 'Vista general', LayoutDashboard], ['schools', 'Establecimientos', School], ['people', 'Dotación', UsersRound], ['plans', 'Planes y cuadratura', BookOpen], ['import', 'Importar datos', UploadCloud], ['history', 'Bitácora de cambios', History] ];
@@ -190,14 +190,45 @@ function ImportPanel({state,commit,notify,goPeople,readOnly}) {
     {done&&<section className="panel import-success"><CheckCircle2 size={35}/><h2>Datos incorporados</h2><p>{done.added} personas nuevas y {done.updated} actualizadas. El cambio quedó en la bitácora.</p><button className="primary-btn" onClick={goPeople}>Revisar dotación <ArrowRight size={16}/></button></section>}</div><aside className="import-aside"><span className="eyebrow">ANTES DE IMPORTAR</span><h2>Un maestro.<br/>Una fuente de verdad.</h2><p>Esta demo utiliza una estructura propia. Adaptaremos el mapeo al maestro real cuando el SLEP entregue sus insumos.</p><div className="import-check"><CheckCircle2 size={18}/><div><strong>Identificación por ID</strong><p>En la demo usamos IDs ficticios; no RUT de personas reales.</p></div></div><div className="import-check"><CheckCircle2 size={18}/><div><strong>Asignación por establecimiento</strong><p>Utiliza EST-001 a EST-056, disponibles en Establecimientos.</p></div></div><div className="import-check"><CheckCircle2 size={18}/><div><strong>Sin cambios parciales</strong><p>Si una fila tiene errores, se bloquea el archivo completo.</p></div></div><div className="import-check"><CheckCircle2 size={18}/><div><strong>Unidades de tiempo</strong><p>Contrato en horas de 60 min; lectivas en horas de 45 min.</p></div></div><div className="column-note"><strong>Columnas obligatorias</strong><code>id · nombre · establecimiento_id · tipo · cargo · horas_contrato · horas_lectivas_pedagogicas · financiamiento · contrato</code></div></aside></div>;
 }
 
+function mdToHtml(text) {
+  const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  let html = esc(text);
+  html = html.replace(/^#{1,3} (.*)$/gm, '<strong class="chat-h">$1</strong>');
+  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  html = html.replace(/(^|\n)((?:[-*] .*(?:\n|$))+)/g, (_, pre, block) => `${pre}<ul>${block.trim().split('\n').map(l => `<li>${l.replace(/^[-*] /, '')}</li>`).join('')}</ul>`);
+  html = html.split(/\n{2,}/).map(p => p.includes('<ul>') || p.includes('chat-h') ? p : `<p>${p}</p>`).join('');
+  return html.replace(/\n/g, '<br/>');
+}
+
 function ChatDrawer({ close, scoped }) {
   const [messages, setMessages] = useState([{ role: 'assistant', text: 'Hola, soy el asistente de dotación. Pregúntame, por ejemplo: "¿qué establecimientos tienen déficit?" o "resume las sobrecargas".' }]);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [minimized, setMinimized] = useState(false);
+  const [big, setBig] = useState(false);
+  const [pos, setPos] = useState(null);
   const listRef = useRef();
+  const panelRef = useRef();
+  const dragRef = useRef(null);
   useEffect(() => { listRef.current?.scrollTo({ top: listRef.current.scrollHeight }); }, [messages, busy]);
+  useEffect(() => () => { window.removeEventListener('mousemove', onDragMove); window.removeEventListener('mouseup', onDragEnd); }, []);
   const context = scoped.map(s => ({ nombre: s.name, modalidad: s.modality, estado: s.status, requeridas: s.required, asignadas: s.assigned, brecha: s.gap, sobrecargas: s.overloads }));
+  const onDragMove = e => {
+    const d = dragRef.current; if (!d) return;
+    const w = panelRef.current.offsetWidth, h = panelRef.current.offsetHeight;
+    const x = Math.min(Math.max(8, d.origX + (e.clientX - d.startX)), window.innerWidth - w - 8);
+    const y = Math.min(Math.max(8, d.origY + (e.clientY - d.startY)), window.innerHeight - h - 8);
+    setPos({ x, y });
+  };
+  const onDragEnd = () => { dragRef.current = null; window.removeEventListener('mousemove', onDragMove); window.removeEventListener('mouseup', onDragEnd); };
+  const onDragStart = e => {
+    if (e.target.closest('button')) return;
+    const rect = panelRef.current.getBoundingClientRect();
+    dragRef.current = { startX: e.clientX, startY: e.clientY, origX: rect.left, origY: rect.top };
+    window.addEventListener('mousemove', onDragMove);
+    window.addEventListener('mouseup', onDragEnd);
+  };
   const send = async e => {
     e.preventDefault();
     const text = input.trim();
@@ -213,16 +244,27 @@ function ChatDrawer({ close, scoped }) {
       setError('No se pudo contactar al asistente. ¿Está configurada la API key en el servidor?');
     } finally { setBusy(false); }
   };
-  return <aside className="chat-drawer">
-    <header><div className="icon-surface"><Bot size={18}/></div><div><h2>Asistente de dotación</h2><p>Claude Haiku · analiza el escenario visible</p></div><button className="icon-btn" aria-label="Cerrar asistente" onClick={close}><X size={18}/></button></header>
-    <div className="chat-messages" ref={listRef}>
-      {messages.map((m, i) => <div key={i} className={`chat-bubble ${m.role}`}>{m.text}</div>)}
-      {busy && <div className="chat-bubble assistant chat-typing">Pensando…</div>}
-    </div>
-    {error && <div className="warning-banner chat-error"><AlertTriangle size={16}/>{error}</div>}
-    <form className="chat-input" onSubmit={send}>
-      <input aria-label="Pregúntale al asistente" placeholder="Pregunta sobre déficits, excedentes, sobrecargas…" value={input} onChange={e=>setInput(e.target.value)} disabled={busy}/>
-      <button className="primary-btn" type="submit" disabled={busy || !input.trim()} aria-label="Enviar"><Send size={16}/></button>
-    </form>
+  const style = pos ? { left: pos.x, top: pos.y, right: 'auto', bottom: 'auto' } : undefined;
+  return <aside className={`chat-drawer ${big ? 'big' : ''} ${minimized ? 'minimized' : ''}`} style={style} ref={panelRef}>
+    <header onMouseDown={onDragStart}>
+      <div className="icon-surface"><Bot size={18}/></div>
+      <div><h2>Asistente de dotación</h2>{!minimized && <p>Claude Haiku · analiza el escenario visible</p>}</div>
+      <div className="chat-controls">
+        <button className="icon-btn" aria-label={minimized ? 'Restaurar' : 'Minimizar'} onClick={()=>setMinimized(m=>!m)}>{minimized ? <ChevronUp size={16}/> : <Minus size={16}/>}</button>
+        <button className="icon-btn" aria-label={big ? 'Reducir' : 'Agrandar'} onClick={()=>setBig(b=>!b)} disabled={minimized}>{big ? <Minimize2 size={15}/> : <Maximize2 size={15}/>}</button>
+        <button className="icon-btn" aria-label="Cerrar asistente" onClick={close}><X size={18}/></button>
+      </div>
+    </header>
+    {!minimized && <>
+      <div className="chat-messages" ref={listRef}>
+        {messages.map((m, i) => m.role === 'assistant' ? <div key={i} className="chat-bubble assistant" dangerouslySetInnerHTML={{ __html: mdToHtml(m.text) }}/> : <div key={i} className="chat-bubble user">{m.text}</div>)}
+        {busy && <div className="chat-bubble assistant chat-typing">Pensando…</div>}
+      </div>
+      {error && <div className="warning-banner chat-error"><AlertTriangle size={16}/>{error}</div>}
+      <form className="chat-input" onSubmit={send}>
+        <input aria-label="Pregúntale al asistente" placeholder="Pregunta sobre déficits, excedentes, sobrecargas…" value={input} onChange={e=>setInput(e.target.value)} disabled={busy}/>
+        <button className="primary-btn" type="submit" disabled={busy || !input.trim()} aria-label="Enviar"><Send size={16}/></button>
+      </form>
+    </>}
   </aside>;
 }
