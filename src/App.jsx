@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { LayoutDashboard, School, UsersRound, BookOpen, UploadCloud, History, ChevronDown, ArrowUpRight, ArrowRight, Search, Bell, Download, Plus, Check, X, CheckCircle2, AlertTriangle, Building2, SlidersHorizontal, FileSpreadsheet, FileText, Pencil, RotateCcw, ShieldCheck, CircleHelp, ArrowLeft, GraduationCap, Sprout, Layers, Clock3, Menu, BriefcaseBusiness, TrendingUp } from 'lucide-react';
+import { LayoutDashboard, School, UsersRound, BookOpen, UploadCloud, History, ChevronDown, ArrowUpRight, ArrowRight, Search, Bell, Download, Plus, Check, X, CheckCircle2, AlertTriangle, Building2, SlidersHorizontal, FileSpreadsheet, FileText, Pencil, RotateCcw, ShieldCheck, CircleHelp, ArrowLeft, GraduationCap, Sprout, Layers, Clock3, Menu, BriefcaseBusiness, TrendingUp, Bot, Send } from 'lucide-react';
 import { MODALITIES, STORAGE_KEY, fmt, round, capacityPedagogical, teacherCheck, summarizeSchool, createSeed, serializeCSV, parseCSV, validateImport, applyImport, sampleImport } from './core.mjs';
 
 const NAV = [ ['overview', 'Vista general', LayoutDashboard], ['schools', 'Establecimientos', School], ['people', 'Dotación', UsersRound], ['plans', 'Planes y cuadratura', BookOpen], ['import', 'Importar datos', UploadCloud], ['history', 'Bitácora de cambios', History] ];
@@ -28,6 +28,7 @@ export default function App() {
   const [storageError, setStorageError] = useState(false);
   const [mobileNav, setMobileNav] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
   useEffect(() => { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); setStorageError(false); } catch { setStorageError(true); } }, [state]);
   useEffect(() => { if (!notice) return; const timer = setTimeout(() => setNotice(''), 5000); return () => clearTimeout(timer); }, [notice]);
   useEffect(() => { setPersonPage(1); }, [query, modality, personType, scope, selectedSchool]);
@@ -97,7 +98,7 @@ export default function App() {
       <div className="sidebar-user"><span className="avatar">CM</span><div>Equipo CMEstudios<small>Administrador · Demo local</small></div></div>
     </aside>
     <main>
-      <header className="topbar"><div className="breadcrumb"><button className="icon-btn mobile-only" aria-label="Abrir menú" onClick={()=>setMobileNav(!mobileNav)}><Menu size={20}/></button><span>Planificación</span><span>/</span><strong>{NAV.find(n=>n[0]===page)[1]}</strong></div><div className="topbar-right"><span className="local-dot">Demo local · datos ficticios</span><button className="icon-btn notification" aria-label="Ver alertas" onClick={()=>setModal({type:'alerts'})}><Bell size={19}/><i/></button><span className="top-avatar">CM</span></div></header>
+      <header className="topbar"><div className="breadcrumb"><button className="icon-btn mobile-only" aria-label="Abrir menú" onClick={()=>setMobileNav(!mobileNav)}><Menu size={20}/></button><span>Planificación</span><span>/</span><strong>{NAV.find(n=>n[0]===page)[1]}</strong></div><div className="topbar-right"><span className="local-dot">Demo local · datos ficticios</span><button className="icon-btn" aria-label="Asistente de dotación" onClick={()=>setChatOpen(true)}><Bot size={19}/></button><button className="icon-btn notification" aria-label="Ver alertas" onClick={()=>setModal({type:'alerts'})}><Bell size={19}/><i/></button><span className="top-avatar">CM</span></div></header>
       <div className="content">
         {storageError&&<div className="warning-banner"><AlertTriangle size={17}/>El navegador no pudo guardar los cambios. Exporta los datos antes de cerrar.</div>}
         <div className="page-heading"><div><div className="eyebrow">DOTACIÓN ESCOLAR / 2027</div><h1>{Titles[page][0]}</h1><p>{Titles[page][1]}</p></div><div className="heading-actions"><span className="period-pill"><span/>Año escolar 2027</span><select aria-label="Vista de demostración" value={scope} onChange={e=>{setScope(e.target.value);setQuery('');}}><option value="all">Sostenedor · vista demo</option><option value="school">Establecimiento · vista demo</option></select></div></div>
@@ -150,6 +151,7 @@ export default function App() {
     {modal?.type==='guide'&&<Dialog title="Un recorrido de 4 minutos" subtitle="Cinco capacidades exigidas para el Anexo 7" close={()=>setModal(null)}><div className="dialog-body guide-steps">{[['00:00','Vista general','Dashboard con docentes, asistentes y cobertura.'],['00:40','Importar datos','Carga CSV, validación y confirmación de cambios.'],['01:30','Modalidades','Escuela regular, TP, jardín VTF y microcentro.'],['02:20','Cuadratura','Edita un plan o una jornada y muestra el recálculo.'],['03:15','Cierre','Exporta un reporte y revisa la bitácora.']].map(([time,title,desc])=><div key={time}><span>{time}</span><section><h3>{title}</h3><p>{desc}</p></section></div>)}</div><div className="dialog-actions"><button className="primary-btn" onClick={()=>{setModal(null);changePage('overview');}}>Comenzar recorrido <ArrowRight size={16}/></button></div></Dialog>}
     {modal?.type==='alerts'&&<Dialog title="Alertas de planificación" subtitle="Resultados según parámetros del escenario" close={()=>setModal(null)}><div className="dialog-body"><div className="warning-banner"><AlertTriangle size={18}/>{deficits.length} unidades con déficit · {overloads} sobrecargas.</div>{scoped.filter(s=>s.status==='Déficit'||s.status==='Sobrecarga'||s.status==='Por validar').slice(0,12).map(s=><button className="alert-item" key={s.id} onClick={()=>{goPlan(s.id);setModal(null);}}><div><strong>{s.name}</strong><small>{s.modality==='Jardín VTF'?'Coeficientes VTF pendientes de validación':`${fmt(s.gap)} h pedagógicas de diferencia`}</small></div><Status value={s.status}/><ArrowUpRight size={16}/></button>)}</div></Dialog>}
     {modal?.type==='reset'&&<Dialog title="¿Restablecer el escenario?" subtitle="Se eliminarán ajustes, importaciones y bitácora de esta demo." close={()=>setModal(null)}><div className="dialog-body"><p>Los archivos que ya descargaste se conservan. Esta acción recupera los 2.200 registros ficticios iniciales.</p></div><div className="dialog-actions"><button className="secondary-btn" onClick={()=>setModal(null)}>Cancelar</button><button className="primary-btn" onClick={()=>{setState(createSeed());setModal(null);setNotice('Escenario inicial restablecido.');}}>Restablecer demo</button></div></Dialog>}
+    {chatOpen&&<ChatDrawer close={()=>setChatOpen(false)} scoped={scoped}/>}
   </div>;
 }
 
@@ -186,4 +188,41 @@ function ImportPanel({state,commit,notify,goPeople,readOnly}) {
     {error&&<div className="warning-banner" role="alert"><AlertTriangle size={19}/>{error}</div>}
     {candidate&&<section className="panel preview-card"><div className="panel-heading"><div><h2>Revisión antes de importar</h2><p>{candidate.name} · {candidate.rows.length} filas</p></div><span className={`badge ${result.errors.length?'amber':'green'}`}>{result.errors.length?'Requiere correcciones':'Validación completa'}</span></div>{result.errors.length?<div className="validation-errors" role="alert"><strong>No se aplicó ningún cambio.</strong><ul>{result.errors.slice(0,15).map((e,i)=><li key={i}>{e}</li>)}</ul>{result.errors.length>15&&<p>Y {result.errors.length-15} errores adicionales.</p>}</div>:<><div className="mini-summary"><span><strong>{result.people.filter(p=>!state.staff.some(s=>s.id===p.id)).length}</strong> nuevos</span><span><strong>{result.people.filter(p=>state.staff.some(s=>s.id===p.id)).length}</strong> actualizados por ID</span></div><div className="table-scroll"><table><thead><tr><th>ID</th><th>NOMBRE</th><th>ESTABLECIMIENTO</th><th>HORAS</th></tr></thead><tbody>{result.people.slice(0,8).map(p=><tr key={p.id}><td>{p.id}</td><td>{p.name}</td><td>{p.schoolId}</td><td>{p.contractHours} h contrato</td></tr>)}</tbody></table></div><p className="field-help padded">Los IDs existentes se actualizan; las personas nuevas se agregan. Los registros que no aparecen en el archivo se conservan. Las posibles sobrecargas quedan visibles como alertas.</p></>}<div className="dialog-actions"><button className="secondary-btn" onClick={()=>setCandidate(null)}>Descartar archivo</button><button className="primary-btn" disabled={result.errors.length>0||readOnly} onClick={confirm}>Confirmar importación <Check size={17}/></button></div></section>}
     {done&&<section className="panel import-success"><CheckCircle2 size={35}/><h2>Datos incorporados</h2><p>{done.added} personas nuevas y {done.updated} actualizadas. El cambio quedó en la bitácora.</p><button className="primary-btn" onClick={goPeople}>Revisar dotación <ArrowRight size={16}/></button></section>}</div><aside className="import-aside"><span className="eyebrow">ANTES DE IMPORTAR</span><h2>Un maestro.<br/>Una fuente de verdad.</h2><p>Esta demo utiliza una estructura propia. Adaptaremos el mapeo al maestro real cuando el SLEP entregue sus insumos.</p><div className="import-check"><CheckCircle2 size={18}/><div><strong>Identificación por ID</strong><p>En la demo usamos IDs ficticios; no RUT de personas reales.</p></div></div><div className="import-check"><CheckCircle2 size={18}/><div><strong>Asignación por establecimiento</strong><p>Utiliza EST-001 a EST-056, disponibles en Establecimientos.</p></div></div><div className="import-check"><CheckCircle2 size={18}/><div><strong>Sin cambios parciales</strong><p>Si una fila tiene errores, se bloquea el archivo completo.</p></div></div><div className="import-check"><CheckCircle2 size={18}/><div><strong>Unidades de tiempo</strong><p>Contrato en horas de 60 min; lectivas en horas de 45 min.</p></div></div><div className="column-note"><strong>Columnas obligatorias</strong><code>id · nombre · establecimiento_id · tipo · cargo · horas_contrato · horas_lectivas_pedagogicas · financiamiento · contrato</code></div></aside></div>;
+}
+
+function ChatDrawer({ close, scoped }) {
+  const [messages, setMessages] = useState([{ role: 'assistant', text: 'Hola, soy el asistente de dotación. Pregúntame, por ejemplo: "¿qué establecimientos tienen déficit?" o "resume las sobrecargas".' }]);
+  const [input, setInput] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const listRef = useRef();
+  useEffect(() => { listRef.current?.scrollTo({ top: listRef.current.scrollHeight }); }, [messages, busy]);
+  const context = scoped.map(s => ({ nombre: s.name, modalidad: s.modality, estado: s.status, requeridas: s.required, asignadas: s.assigned, brecha: s.gap, sobrecargas: s.overloads }));
+  const send = async e => {
+    e.preventDefault();
+    const text = input.trim();
+    if (!text || busy) return;
+    setMessages(m => [...m, { role: 'user', text }]);
+    setInput(''); setBusy(true); setError('');
+    try {
+      const res = await fetch('/api/dotacion-chat', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ message: text, context }) });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error del servidor');
+      setMessages(m => [...m, { role: 'assistant', text: data.reply }]);
+    } catch (err) {
+      setError('No se pudo contactar al asistente. ¿Está configurada la API key en el servidor?');
+    } finally { setBusy(false); }
+  };
+  return <aside className="chat-drawer">
+    <header><div className="icon-surface"><Bot size={18}/></div><div><h2>Asistente de dotación</h2><p>Claude Haiku · analiza el escenario visible</p></div><button className="icon-btn" aria-label="Cerrar asistente" onClick={close}><X size={18}/></button></header>
+    <div className="chat-messages" ref={listRef}>
+      {messages.map((m, i) => <div key={i} className={`chat-bubble ${m.role}`}>{m.text}</div>)}
+      {busy && <div className="chat-bubble assistant chat-typing">Pensando…</div>}
+    </div>
+    {error && <div className="warning-banner chat-error"><AlertTriangle size={16}/>{error}</div>}
+    <form className="chat-input" onSubmit={send}>
+      <input aria-label="Pregúntale al asistente" placeholder="Pregunta sobre déficits, excedentes, sobrecargas…" value={input} onChange={e=>setInput(e.target.value)} disabled={busy}/>
+      <button className="primary-btn" type="submit" disabled={busy || !input.trim()} aria-label="Enviar"><Send size={16}/></button>
+    </form>
+  </aside>;
 }
