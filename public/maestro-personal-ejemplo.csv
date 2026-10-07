@@ -1,0 +1,4 @@
+﻿"id";"nombre";"establecimiento_id";"tipo";"cargo";"horas_contrato";"horas_lectivas_pedagogicas";"financiamiento";"contrato"
+"DEMO-0001";"Ana Rojas Vera";"EST-001";"Docente";"Docente de aula";"44";"36";"General";"Indefinido"
+"IMPORT-0001";"Elena Ejemplo Demo";"EST-002";"Docente";"Docente de aula";"30";"26";"SEP";"Plazo fijo"
+"IMPORT-0002";"Jorge Ejemplo Demo";"EST-039";"Asistente";"Técnica en párvulos";"44";"0";"General";"Indefinido"

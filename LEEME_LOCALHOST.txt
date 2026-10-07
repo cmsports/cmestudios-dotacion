@@ -1,0 +1,22 @@
+DEMO CMESTUDIOS - LOCALHOST EN TU COMPUTADOR
+
+1. Descomprime el ZIP completo.
+2. Entra en la carpeta cmestudios-dotacion.
+3. Windows: doble clic en ABRIR_LOCALHOST_WINDOWS.bat.
+   Mac: doble clic en ABRIR_LOCALHOST_MAC.command.
+   Linux: ejecuta ABRIR_LOCALHOST_LINUX.sh.
+4. El iniciador abre Google Chrome en http://localhost:5173.
+   Si Chrome no esta instalado, intenta abrir el navegador predeterminado.
+
+Necesita Python 3 instalado. No necesita Node ni npm.
+Mantén abierta la ventana del servidor mientras uses la demo.
+Para detenerlo: Ctrl+C.
+Si el puerto 5173 esta ocupado, puedes ejecutar:
+  python3 iniciar_demo.py --port 5174 --open
+  Windows: py -3 iniciar_demo.py --port 5174 --open
+
+El servidor solo escucha en este computador (127.0.0.1).
+La demo utiliza datos ficticios y guarda cambios en el navegador.
+
+El servidor del chat corre en un entorno remoto y no en tu computador.
+Por eso el iniciador debe ejecutarse en el equipo donde abres Chrome.
