@@ -1,16 +1,13 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { LayoutDashboard, School, UsersRound, BookOpen, UploadCloud, History, ChevronDown, ChevronUp, ArrowUpRight, ArrowRight, Search, Bell, Download, Plus, Check, X, CheckCircle2, AlertTriangle, Building2, SlidersHorizontal, FileSpreadsheet, FileText, Pencil, RotateCcw, ShieldCheck, CircleHelp, ArrowLeft, GraduationCap, Sprout, Layers, Clock3, Menu, BriefcaseBusiness, TrendingUp, ChartColumn, UserMinus, UserX, Puzzle, Baby, Wrench, MapPin, Utensils, Scale, UserPlus, FileSignature, Table2, Sparkles, ArrowRightLeft, ArrowLeftRight } from 'lucide-react';
+import { LayoutDashboard, School, UsersRound, BookOpen, UploadCloud, History, ChevronDown, ChevronUp, ArrowUpRight, ArrowRight, Search, Bell, Download, Plus, Check, X, CheckCircle2, AlertTriangle, Building2, SlidersHorizontal, FileSpreadsheet, FileText, Pencil, RotateCcw, ShieldCheck, CircleHelp, ArrowLeft, GraduationCap, Sprout, Layers, Clock3, Menu, BriefcaseBusiness, TrendingUp, ChartColumn, UserMinus, UserX, Puzzle, Baby, Wrench, MapPin, Utensils, Scale, UserPlus, FileSignature, Table2, ArrowRightLeft, ArrowLeftRight } from 'lucide-react';
 import { MODALITIES, STORAGE_KEY, STATE_VERSION, DEFAULT_SETTINGS, FUNDING, CONTRACTS, RENEWABLE, PROJECTIONS, TP_TRACKS, TEACHER_FUNCTIONS, FULL_TIME, fmt, round, capacityPedagogical, teacherCheck, teacherFunction, assistantCategory, summarizeSchool, summarizeTracks, summarizeRural, summarizePie, vtfLevelsOf, computeIndicators, indicatorRows, createSeed, serializeCSV, parseCSV, validateImport, applyImport, sampleImport, movableTeachers, suggestReassignments, applyReassignments } from './core.mjs';
-import { DEFAULT_PPL, PERIOD_LABEL, buildData, partsOf, mergeResults } from './ppl.mjs';
-import { buildReport, formatPct } from './pplReport.mjs';
-import { generalPdf, schoolsPdf, teachersBook, planningBook, categoryRows } from './pplExports.mjs';
 import { BRAND, hasFuero, indicatorsBook, indicatorsPdf, schoolSheetBook, schoolSheetPdf, listBook } from './exports.mjs';
 
 // El menú sigue el orden de trabajo: cargar datos, revisar, analizar y dejar registro.
 const NAV_GROUPS = [
   ['INICIO', [['overview', 'Vista general', LayoutDashboard]]],
   ['1 · DATOS', [['import', 'Importar datos', UploadCloud], ['schools', 'Establecimientos', School], ['people', 'Dotación', UsersRound]]],
-  ['2 · ANÁLISIS', [['plans', 'Cuadratura', BookOpen], ['optimizer', 'Optimizador', Sparkles], ['reassign', 'Reasignación', ArrowLeftRight], ['indicators', 'Indicadores PAL', ChartColumn]]],
+  ['2 · ANÁLISIS', [['plans', 'Cuadratura', BookOpen], ['reassign', 'Reasignación', ArrowLeftRight], ['indicators', 'Indicadores PAL', ChartColumn]]],
   ['3 · REGISTRO', [['history', 'Bitácora de cambios', History]]],
 ];
 const NAV = NAV_GROUPS.flatMap(g => g[1]);
@@ -21,7 +18,6 @@ const Titles = {
   people: ['Las personas detrás de cada aula.', 'Busca, filtra y abre la ficha de cada persona o cargo vacante.'],
   plans: ['De las horas al equilibrio.', 'Plan de estudios contra horas asignadas, según la modalidad del establecimiento.'],
   reassign: ['De donde sobra, a donde falta.', 'Mueve docentes de establecimientos con excedente a otros con déficit y revisa el efecto antes de aplicar.'],
-  optimizer: ['La mejor repartición posible.', 'El PPL reparte a los docentes entre los colegios con la carga óptima y entrega la planificación de cada establecimiento.'],
   indicators: ['Los números del Plan Anual Local.', 'Indicadores de dotación exigidos por la DEP, calculados en tiempo real.'],
   history: ['Cada decisión deja una huella.', 'Todos los cambios del escenario, con su motivo.'],
 };
@@ -44,18 +40,6 @@ function modalityCopy(school) {
 }
 // Cambio de establecimiento: conserva horas y contrato; la formación TP o la escuela rural se reasignan en el destino.
 const moveTo = (p, dest) => ({ ...p, schoolId: dest.id, extraSchool: undefined, extraPed: 0, track: p.type === 'Docente' && dest.modality === 'Técnico profesional' ? 'Formación general' : undefined, ruralSchool: dest.modality === 'Microcentro' ? dest.ruralMembers[0]?.name : undefined });
-// Abierta como archivo suelto (ABRIR_DEMO.html) no se pueden cargar el solver ni sus procesos en segundo plano.
-const OFFLINE = typeof location !== 'undefined' && location.protocol === 'file:';
-function runPpl(state, ids, params, onPhase, onStart = () => {}) {
-  const D = buildData(state, ids, state.settings); const parts = partsOf(D, params); onStart(parts);
-  return Promise.all(parts.map(part => new Promise(resolve => {
-    const worker = new Worker(new URL('./ppl.worker.mjs', import.meta.url), { type: 'module' });
-    const fail = message => { worker.terminate(); resolve({ part, log: [{ part, label: 'Error', status: message, value: null, seconds: 0 }], size: { variables: 0, enteras: 0 } }); };
-    worker.onmessage = ({ data }) => { if (data.type === 'phase') return onPhase(part, data.phase); if (data.type !== 'done') return fail(data.message); worker.terminate(); const r = data.result; resolve({ ...(r.failed.length ? {} : r), part, log: r.log, size: r.size }); };
-    worker.onerror = e => fail(e.message || 'No se pudo iniciar el optimizador.');
-    worker.postMessage({ state, ids: [...ids], settings: state.settings, params, part });
-  }))).then(results => { const R = mergeResults(results); return { D, R, report: buildReport(state, D, R) }; });
-}
 function saveDownload(name, content, type = 'text/csv;charset=utf-8') { const a = document.createElement('a'); const url = URL.createObjectURL(new Blob([content], {type})); a.href = url; a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); }
 function Dialog({ title, subtitle, children, close, wide = false }) {
   const ref = useRef(); const previous = useRef(document.activeElement); const pressedOutside = useRef(false);
@@ -83,7 +67,6 @@ export default function App() {
   const [mobileNav, setMobileNav] = useState(false);
   const [busy, setBusy] = useState(false);
   const [selected, setSelected] = useState(() => new Set());
-  const [opt, setOpt] = useState({ status: 'idle', params: { ...DEFAULT_PPL }, progress: {}, result: null, ranOn: null });
   useEffect(() => { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); setStorageError(false); } catch { setStorageError(true); } }, [state]);
   useEffect(() => { if (!notice) return; const timer = setTimeout(() => setNotice(''), 5000); return () => clearTimeout(timer); }, [notice]);
   useEffect(() => { setPersonPage(1); }, [query, modality, personType, situation, schoolFilter, scope, selectedSchool]);
@@ -163,37 +146,11 @@ export default function App() {
   ];
   const newVacancy = () => { const ratio = school.lectiveRatio; const needed = Math.max(0, -summary.gap); const contractHours = Math.min(FULL_TIME, Math.max(1, Math.ceil(needed / (ratio * 60 / 45)))); setModal({ type: 'person', isNew: true, person: { id: `VAC-${String(Math.max(0, ...state.staff.filter(p => p.vacant).map(p => parseInt(p.id.slice(4), 10) || 0)) + 1).padStart(3, '0')}`, name: 'Cargo vacante por proveer', schoolId: school.id, type: 'Docente', role: 'Docente de aula', contractHours, assignedPed: round(Math.min(needed, capacityPedagogical(contractHours, ratio))), funding: 'General', contract: 'Contrata', protection: '', projection: 'Aumento', changeHours: contractHours, justification: '', vacant: true, ...(school.modality === 'Técnico profesional' ? { track: 'Formación general' } : {}), ...(school.modality === 'Microcentro' ? { ruralSchool: school.ruralMembers[0]?.name } : {}) } }); };
   const editSchool = section => setModal({ type: 'school', section });
-  const runOptimizer = async () => {
-    const ids = new Set(scoped.filter(x => x.modality !== 'Jardín VTF').map(x => x.id)); const started = Date.now();
-    setOpt(o => ({ ...o, status: 'running', progress: {}, error: null }));
-    try {
-      const result = await runPpl(state, ids, opt.params, (part, phase) => setOpt(o => ({ ...o, progress: { ...o.progress, [part]: [...(o.progress[part] ?? []), phase] } })), parts => setOpt(o => ({ ...o, progress: Object.fromEntries(parts.map(x => [x, []])) })));
-      setOpt(o => ({ ...o, status: 'done', result, ranOn: state, seconds: Math.round((Date.now() - started) / 1000) }));
-    } catch (e) { setOpt(o => ({ ...o, status: 'error', error: String(e?.message || e) })); }
-  };
-  const applyMoves = (moves, reason) => {
-    const byPerson = new Map(moves.map(m => [m.id, m]));
-    commit(prev => ({ ...prev, staff: prev.staff.map(p => { const m = byPerson.get(p.id); if (!m) return p; const dest = prev.schools.find(x => x.id === m.to);
-      // Si el modelo también le extiende la jornada para hacer esas horas, el contrato acompaña al traslado.
-      const ext = m.contractAtMove > p.contractHours ? { contractHours: m.contractAtMove, projection: 'Aumento', changeHours: round(m.contractAtMove - p.contractHours) } : {};
-      return m.kind === 'Cambio completo' ? { ...moveTo(p, dest), ...ext, assignedPed: m.destHours, justification: `Optimizador: cambio a ${dest.name}. ${reason}` } : { ...p, ...ext, assignedPed: m.originHours, extraSchool: m.to, extraPed: m.destHours, justification: `Optimizador: comparte jornada con ${dest.name}. ${reason}` }; }) }), 'Traslados del optimizador aplicados', `${moves.length} docente${moves.length > 1 ? 's' : ''}: ${moves.map(m => `${m.name} → ${m.toName} (${fmt(m.destHours)} h)`).join('; ')}. Motivo: ${reason}`);
-    setNotice(`${moves.length} traslado${moves.length > 1 ? 's' : ''} aplicado${moves.length > 1 ? 's' : ''}. La cuadratura se recalculó.`);
-  };
   const bulkMove = (to, reason) => {
     const dest = state.schools.find(x => x.id === to); const list = state.staff.filter(p => selected.has(p.id));
     commit(prev => ({ ...prev, staff: prev.staff.map(p => selected.has(p.id) ? { ...moveTo(p, dest), justification: `Traslado a ${dest.name}. ${reason}` } : p) }), 'Traslado de personas', `${list.length} persona${list.length > 1 ? 's' : ''} a ${dest.name}: ${list.map(p => p.name).join(', ')}. Motivo: ${reason}`);
     setSelected(new Set()); setModal(null); setNotice(`${list.length} persona${list.length > 1 ? 's' : ''} movida${list.length > 1 ? 's' : ''} a ${dest.name}.`);
   };
-  // Al entrar al optimizador por primera vez, la optimización parte sola.
-  useEffect(() => { if (page === 'optimizer' && opt.status === 'idle' && !OFFLINE) runOptimizer(); }, [page]);
-  const optRep = opt.result?.report; const optLabel = scope === 'all' ? 'SLEP Llanquihue · todos los establecimientos escolares' : summary.name;
-  const optMenu = optRep ? [
-    { icon: FileText, label: 'Informe general (PDF)', hint: 'Resumen, fases del modelo, establecimientos y traslados', run: () => runExport(async () => generalPdf(optRep, optLabel, await pdfKit()).save('optimizacion-informe-general.pdf'), 'Informe general descargado.') },
-    { icon: FileSignature, label: 'Informes por establecimiento (PDF)', hint: 'Horas por categoría, sugerencias, planificación y docentes de cada colegio', run: () => runExport(async () => schoolsPdf(optRep, opt.result.R, optRep.schools.map(x => x.id), await pdfKit()).save('optimizacion-por-establecimiento.pdf'), 'Informes por establecimiento descargados.') },
-    { icon: FileSpreadsheet, label: 'Docentes con sugerencias (Excel)', hint: 'Carga antes y después, uso de capacidad, estado y sugerencia de cada docente', run: () => runExport(async () => { const XLSX = await import('xlsx'); XLSX.writeFile(teachersBook(optRep, XLSX), 'optimizacion-docentes.xlsx', { compression: true }); }, 'Excel de docentes descargado.') },
-    { icon: Table2, label: 'Planificación completa (Excel)', hint: 'Curso por curso, horas por categoría, docentes y traslados', run: () => runExport(async () => { const XLSX = await import('xlsx'); XLSX.writeFile(planningBook(optRep, opt.result.R, XLSX), 'optimizacion-planificacion.xlsx', { compression: true }); }, 'Planificación descargada.') },
-  ] : [];
-  const schoolReport = id => runExport(async () => schoolsPdf(optRep, opt.result.R, [id], await pdfKit()).save(`optimizacion-${id}.pdf`), 'Informe del establecimiento descargado.');
   const saveSchool = (s, section, applyVtf, reason) => {
     const vtfCount = state.schools.filter(x => x.modality === 'Jardín VTF').length;
     const detail = { general: `${s.modality === 'Jardín VTF' ? '' : `proporción ${s.lectiveRatio * 100}/${100 - s.lectiveRatio * 100}, ${s.jec ? 'con' : 'sin'} JEC, `}proyección ${s.projection}`, pie: `PIE ${s.pie?.courses} cursos, ${s.pie?.neet} NEE transitorias y ${s.pie?.neep} permanentes`, rural: s.ruralMembers.map(m => `${m.name}: ${m.enrollment} estudiantes, ${m.groups} cursos`).join('; '), vtf: vtfLevelsOf(s).map(l => `${l.level} ${l.enrollment} niños (1 educadora/${l.educatorPerChildren ?? '?'}, 1 técnica/${l.technicianPerChildren ?? '?'})`).join('; ') + (applyVtf ? `. Coeficientes aplicados a los ${vtfCount} jardines VTF` : '') }[section];
@@ -240,13 +197,11 @@ export default function App() {
           </div>
         </>}
 
-        {page==='optimizer'&&<OptimizerPage opt={opt} setParam={(k,v)=>setOpt(o=>({...o,params:{...o.params,[k]:v}}))} run={runOptimizer} stale={!!opt.ranOn&&opt.ranOn!==state} schools={scoped} busy={busy} menu={optMenu} applyMoves={applyMoves} schoolReport={schoolReport} goPlan={goPlan}/>}
-
         {page==='indicators'&&indicators&&<IndicatorsPage ind={indicators} settings={settings} busy={busy} menu={indicatorMenu} editSettings={()=>setModal({type:'settings'})} openSchool={goPlan} goPeople={goPeople} scopeAll={scope==='all'}/>}
 
         {page==='schools'&&<>
           <section className="small-stats"><span><strong>{scoped.length}</strong> unidades de gestión</span><span><strong>{scoped.filter(s=>s.modality==='Jardín VTF').length}</strong> jardines VTF</span><span><strong>{scoped.filter(s=>s.modality==='Microcentro').reduce((a,s)=>a+s.ruralMembers.length,0)}</strong> escuelas rurales en microcentros</span></section>
-          <SideBySide schools={scoped} open={goPlan} optimize={()=>changePage('optimizer')}/>
+          <SideBySide schools={scoped} open={goPlan}/>
           <div className="filter-bar"><SearchBox value={query} change={setQuery} placeholder="Buscar establecimiento o comuna"/><Filter label="Modalidad"><ModeSelect value={modality} change={setModality}/></Filter></div>
           <section className="panel"><div className="panel-heading"><div><h2>Establecimientos y microcentros</h2><p>{visibleSchools.length} unidades · haz clic en una fila para abrir su cuadratura</p></div><ExportMenu busy={busy} items={listMenu('schools','establecimientos-2027','Listado con brechas')}/></div><SchoolTable rows={visibleSchools} open={goPlan}/></section>
         </>}
@@ -358,12 +313,12 @@ function IndicatorsPage({ind,settings,busy,menu,editSettings,openSchool,goPeople
 }
 
 // Déficit y excedente en dos columnas, para ver de un vistazo dónde faltan y dónde sobran horas.
-function SideBySide({schools,open,optimize}) {
+function SideBySide({schools,open}) {
   const list=schools.filter(s=>s.modality!=='Jardín VTF');
   const deficit=list.filter(s=>s.gap<-0.01).sort((a,b)=>a.gap-b.gap); const surplus=list.filter(s=>s.gap>0.01).sort((a,b)=>b.gap-a.gap);
   const total=items=>items.reduce((n,s)=>n+Math.abs(s.gap),0);
   const column=(title,items,tone)=><div className="side-col"><div className={`side-head ${tone}`}><strong>{title} · {items.length}</strong><span>{tone==='deficit'?'Faltan':'Sobran'} {fmt(total(items))} h pedagógicas</span></div><div className="side-items">{items.map(s=><button key={s.id} className="side-item" onClick={()=>open(s.id)}><span><strong>{s.name}</strong><small>{s.commune} · {s.modality}</small></span><b className={tone==='deficit'?'text-amber':'text-teal'}>{s.gap>0?'+':''}{fmt(s.gap)} h</b></button>)}{!items.length&&<p className="field-help padded">Ninguno.</p>}</div></div>;
-  return <section className="panel side-panel"><div className="panel-heading"><div><h2>Déficit y excedente, lado a lado</h2><p>Dónde faltan y dónde sobran horas lectivas · haz clic en un colegio para abrir su cuadratura</p></div>{optimize&&<button className="secondary-btn" onClick={optimize}><Sparkles size={15}/>Redistribuir con el optimizador</button>}</div><div className="side-grid">{column('Con déficit',deficit,'deficit')}{column('Con excedente',surplus,'surplus')}</div></section>;
+  return <section className="panel side-panel"><div className="panel-heading"><div><h2>Déficit y excedente, lado a lado</h2><p>Dónde faltan y dónde sobran horas lectivas · haz clic en un colegio para abrir su cuadratura</p></div></div><div className="side-grid">{column('Con déficit',deficit,'deficit')}{column('Con excedente',surplus,'surplus')}</div></section>;
 }
 
 function BulkMoveDialog({people,schools,close,save}) {
@@ -378,74 +333,6 @@ function BulkMoveDialog({people,schools,close,save}) {
   </div><div className="dialog-actions"><button type="button" className="secondary-btn" onClick={close}>Cancelar</button><button className="primary-btn">Mover {people.length} persona{people.length>1?'s':''} <Check size={16}/></button></div></form></Dialog>;
 }
 
-const OPT_STEPS=[['Cubrir el plan','Que ningún curso quede sin docente: usa capacidad libre, renovaciones, extensiones y traslados entre colegios.'],['Pagar lo justo','Con el plan cubierto, la menor cantidad de horas de contrato.'],['Equilibrar','Que ningún colegio quede muy sobrado de horas.'],['Equilibrar a todos','Acerca la holgura de cada colegio al promedio.'],['Cambiar lo mínimo','Entre las mejores soluciones, la más parecida a la distribución vigente.']];
-const LABEL_TONE={Eficiente:'green',Aceptable:'blue',Ineficiente:'amber','Sin clases':'amber','No disponible':'neutral','Apoyo PIE':'neutral'};
-function OptimizerPage({opt,setParam,run,stale,schools,busy,menu,applyMoves,schoolReport,goPlan}) {
-  const [tab,setTab]=useState('resumen');const [schoolId,setSchoolId]=useState('');const [period,setPeriod]=useState(1);
-  const [label,setLabel]=useState('Todos');const [query,setQuery]=useState('');const [pageN,setPageN]=useState(1);
-  const [selected,setSelected]=useState(new Set());const [confirming,setConfirming]=useState(false);const [reason,setReason]=useState('');
-  const rep=opt.result?.report;const R=opt.result?.R;const p=opt.params;
-  useEffect(()=>{setSelected(new Set());if(rep&&!rep.schools.some(s=>s.id===schoolId))setSchoolId(rep.schools[0]?.id??'');},[rep]);
-  useEffect(()=>setPageN(1),[label,query]);
-  if(OFFLINE)return <><div className="info-banner"><Sparkles size={20}/><div><strong>El optimizador necesita abrir la demo con su servidor.</strong><span>En este archivo suelto el navegador no puede cargar el solver. Abre la demo con ABRIR_LOCALHOST_WINDOWS.bat (o la versión publicada) y entra a Optimizador: la optimización parte sola.</span></div></div><SideBySide schools={schools} open={goPlan}/></>;
-  const school=rep?.schools.find(s=>s.id===schoolId);
-  const teachers=rep?rep.teachers.filter(t=>(label==='Todos'||(label==='Con cambios'?t.changed:t.label===label))&&`${t.name} ${t.rut} ${t.originName}`.toLowerCase().includes(query.toLowerCase())):[];
-  const toggle=id=>setSelected(prev=>{const next=new Set(prev);next.has(id)?next.delete(id):next.add(id);return next;});
-  const s=rep?.summary;const arrow=(a,b)=>`${a} → ${b}`;
-  const deficit=rep?.schools.filter(x=>x.gapBefore<-0.01).sort((a,b)=>a.gapBefore-b.gapBefore)??[];const surplus=rep?.schools.filter(x=>x.gapBefore>0.01).sort((a,b)=>b.gapBefore-a.gapBefore)??[];
-  const card=x=><button key={x.id} className="side-item" onClick={()=>{setSchoolId(x.id);setTab('colegio');}}><span><strong>{x.name}</strong><small>Sin docente: {fmt(x.uncoveredBefore)} → {fmt(x.uncoveredAfter)} h · recibe {x.incoming.length} · presta {x.outgoing.length}</small></span><b className={x.gapBefore<0?'text-amber':'text-teal'}>{x.gapBefore>0?'+':''}{fmt(x.gapBefore)} h</b></button>;
-  return <>
-    <section className="panel workflow"><div className="panel-heading"><div><h2>Cómo optimiza</h2><p>Programa lineal entero resuelto con HiGHS, en cinco fases y en este orden de prioridad. No cambia la dotación: entrega una propuesta.</p></div></div><div className="workflow-steps opt-steps">{OPT_STEPS.map(([title,desc],i)=><div key={title} className="workflow-step static"><span className="step-head"><span className="step-number">{i+1}</span></span><strong>{title}</strong><small>{desc}</small></div>)}</div></section>
-    <section className="panel"><div className="panel-heading"><div><h2>Reglas del modelo</h2><p>Valores de escenario. Las habilitaciones, licencias y retiros de los docentes son datos inventados de forma fija para la demo.</p></div></div>
-      <div className="dialog-body form-grid opt-params">
-        <label className="check-row"><input type="checkbox" checked={p.misma_comuna} onChange={e=>setParam('misma_comuna',e.target.checked)}/>Traslados solo dentro de la misma comuna</label>
-        <label>Excedente mínimo del colegio que presta (horas)<input type="number" min="0" max="200" step="any" value={p.U} onChange={e=>setParam('U',Number(e.target.value))}/></label>
-        <label className="check-row"><input type="checkbox" checked={p.permitir_extension} onChange={e=>setParam('permitir_extension',e.target.checked)}/>Permitir extender jornadas hasta 44 h</label>
-        <label className="check-row"><input type="checkbox" checked={p.permitir_supresion} onChange={e=>setParam('permitir_supresion',e.target.checked)}/>Permitir suprimir horas sin clases</label>
-        <label>Tope de supresión por persona (% del contrato)<input type="number" min="0" max="100" step="5" value={Math.round(p.max_sup_frac*100)} onChange={e=>setParam('max_sup_frac',Number(e.target.value)/100)}/></label>
-        <label className="check-row"><input type="checkbox" checked={p.sup_titulares} onChange={e=>setParam('sup_titulares',e.target.checked)}/>Permitir suprimir horas a titulares e indefinidos</label>
-        <label className="check-row full"><input type="checkbox" checked={p.kPIE!==1} onChange={e=>setParam('kPIE',e.target.checked?1/0.65:1)}/>El apoyo PIE es lectivo (cada hora PIE usa también su proporción no lectiva)</label>
-      </div>
-      <div className="dialog-actions"><span className="field-help">El fuero gremial siempre protege. Se resuelve por comuna, en paralelo; tarda menos de un minuto. Cambia una regla y vuelve a optimizar.</span><button className="primary-btn" disabled={opt.status==='running'} onClick={run}><Sparkles size={16}/>{opt.status==='running'?'Optimizando…':opt.status==='error'?'Reintentar':'Optimizar de nuevo'}</button></div>
-    </section>
-    {!rep&&opt.status!=='running'&&<SideBySide schools={schools} open={goPlan}/>}
-    {opt.status==='running'&&<section className="panel"><div className="panel-heading"><div><h2>Resolviendo el PPL</h2><p>Una comuna por proceso, en paralelo. Cada fase parte desde la solución de la anterior.</p></div></div><div className="progress-list">{Object.keys(opt.progress).length===0&&<p className="field-help padded">Preparando los datos y el modelo…</p>}{Object.entries(opt.progress).map(([part,phases])=><div key={part} className="progress-row"><strong>{part}</strong><div>{OPT_STEPS.map((step,i)=>{const ph=phases[i];return <span key={step[0]} className={`phase-chip ${ph?ph.status==='Óptimo'?'done':'partial':i===phases.length?'running':''}`}>{i+1} · {step[0]}{ph&&ph.status!=='Óptimo'?' (mejor solución en el tiempo)':''}</span>;})}</div></div>)}</div></section>}
-    {opt.status==='error'&&<div className="warning-banner"><AlertTriangle size={18}/>No se pudo optimizar: {opt.error}</div>}
-    {rep&&<>
-      {stale&&<div className="warning-banner"><AlertTriangle size={18}/>La dotación cambió después de esta optimización. Vuelve a optimizar para trabajar con los datos actuales.</div>}
-      {rep.summary.failed.length>0&&<div className="warning-banner"><AlertTriangle size={18}/>Sin solución en: {rep.summary.failed.join(', ')}. Revisa las reglas del modelo.</div>}
-      <div className="intro-bar"><div className="info-inline"><CheckCircle2 size={18}/>Propuesta para {s.schools} establecimientos y {fmt(s.teachers)} docentes · {opt.seconds} s</div><ExportMenu busy={busy} items={menu} label="Descargar informes"/></div>
-      <div className="tabs" role="tablist">{[['resumen','Resumen general'],['lado','Déficit y excedente'],['colegio','Por establecimiento'],['docentes','Docentes']].map(([id,text])=><button key={id} role="tab" aria-selected={tab===id} className={tab===id?'active':''} onClick={()=>setTab(id)}>{text}</button>)}</div>
-      {tab==='resumen'&&<>
-        <section className="kpis"><Kpi icon={BookOpen} title="Horas de clase sin docente" value={arrow(fmt(s.uncoveredBefore),fmt(s.uncoveredAfter))} footer="Por periodo, horas pedagógicas. Antes = distribución vigente" color="teal"/><Kpi icon={AlertTriangle} title="Colegios con cursos sin docente" value={arrow(s.withVacanciesBefore,s.withVacanciesAfter)} footer={`Quedan ${fmt(s.hireCourses)} cursos por contratar`} color="orange"/><Kpi icon={TrendingUp} title="Docentes con carga eficiente" value={arrow(s.efficientBefore,s.efficientAfter)} footer={`Ineficientes o sin clases: ${s.inefficientBefore} → ${s.inefficientAfter}`} color="blue"/><Kpi icon={Clock3} title="Horas de contrato docentes" value={arrow(fmt(s.contractBefore),fmt(s.contractAfter))} footer="Promedio de los dos periodos" color="purple"/></section>
-        <section className="kpis"><Kpi icon={ArrowRightLeft} title="Traslados sugeridos" value={s.moves} footer="Docentes que hacen clases en otro colegio" color="blue" cta={s.moves?'Ver traslados':null} onClick={s.moves?()=>setTab('lado'):undefined}/><Kpi icon={UserPlus} title="Extensiones de jornada" value={s.extensions} footer={`${fmt(s.extensionHours)} h en total`} color="teal"/><Kpi icon={UserMinus} title="Supresiones" value={s.suppressions} footer={`${fmt(s.suppressionHours)} h de contrato`} color="orange"/><Kpi icon={UserX} title="Contratas renovadas / no renovadas" value={`${s.renewed} / ${s.notRenewed}`} footer="Contratas que vencen antes de marzo" color="purple"/></section>
-        <section className="panel"><div className="panel-heading"><div><h2>Establecimientos que más cambian</h2><p>Haz clic para ver su planificación y sugerencias</p></div></div><div className="table-scroll"><table><thead><tr><th>ESTABLECIMIENTO</th><th>BRECHA ANTES</th><th>SIN DOCENTE</th><th>RECIBE / PRESTA</th><th>SUGERENCIA PRINCIPAL</th></tr></thead><tbody>{[...rep.schools].sort((a,b)=>(b.uncoveredBefore-b.uncoveredAfter)-(a.uncoveredBefore-a.uncoveredAfter)).slice(0,10).map(x=><tr key={x.id} className="clickable" tabIndex={0} onClick={()=>{setSchoolId(x.id);setTab('colegio');}}><td><strong>{x.name}</strong><small>{x.commune} · {x.modality}</small></td><td className={x.gapBefore<0?'text-amber':'text-teal'}>{x.gapBefore>0?'+':''}{fmt(x.gapBefore)} h</td><td>{fmt(x.uncoveredBefore)} → <strong>{fmt(x.uncoveredAfter)}</strong> h</td><td>{x.incoming.length} / {x.outgoing.length}</td><td className="wrap-cell">{x.suggestions[0]}</td></tr>)}</tbody></table></div></section>
-        <section className="panel facts-panel"><div className="panel-heading"><div><h2>Fases del modelo</h2><p>Estado de cada fase por comuna. "Mejor solución en el tiempo" = la mejor encontrada dentro del límite de segundos de esa fase.</p></div></div><div className="table-scroll"><table><thead><tr><th>COMUNA</th><th>FASE</th><th>ESTADO</th><th>VALOR</th><th>SEGUNDOS</th></tr></thead><tbody>{s.phases.map((ph,i)=><tr key={i}><td>{ph.part}</td><td>{ph.label}</td><td><span className={`badge ${ph.status==='Óptimo'?'green':'blue'}`}>{ph.status}</span></td><td>{ph.value===null?'—':fmt(ph.value)}</td><td>{fmt(ph.seconds)}</td></tr>)}</tbody></table></div></section>
-      </>}
-      {tab==='lado'&&<>
-        <section className="panel side-panel"><div className="panel-heading"><div><h2>Déficit y excedente, antes y después</h2><p>Brecha de la cuadratura actual y horas sin docente con la propuesta · haz clic para ver el colegio</p></div></div><div className="side-grid"><div className="side-col"><div className="side-head deficit"><strong>Con déficit · {deficit.length}</strong><span>Antes de optimizar</span></div><div className="side-items">{deficit.map(card)}</div></div><div className="side-col"><div className="side-head surplus"><strong>Con excedente · {surplus.length}</strong><span>Antes de optimizar</span></div><div className="side-items">{surplus.map(card)}</div></div></div></section>
-        <section className="panel module-panel"><div className="panel-heading"><div><h2>Traslados sugeridos · {rep.moves.length}</h2><p>Docentes de colegios con excedente que pasan a hacer clases en colegios con déficit. Marca los que quieras aplicar a la demo.</p></div>{rep.moves.length>0&&<label className="check-row"><input type="checkbox" checked={selected.size>0&&selected.size===rep.moves.filter(m=>m.applicable).length} onChange={e=>setSelected(e.target.checked?new Set(rep.moves.filter(m=>m.applicable).map(m=>m.id)):new Set())}/>Seleccionar todos</label>}</div>
-          {rep.moves.length?<div className="table-scroll"><table><thead><tr><th className="check-cell"><span className="sr-only">Seleccionar</span></th><th>DOCENTE</th><th>DESDE</th><th>HACIA</th><th>HORAS EN DESTINO</th><th>TIPO</th><th>ASIGNATURAS</th></tr></thead><tbody>{rep.moves.map(m=><tr key={m.id} className={m.applicable?'clickable':''} onClick={()=>m.applicable&&toggle(m.id)}><td className="check-cell"><input type="checkbox" aria-label={`Seleccionar a ${m.name}`} disabled={!m.applicable} title={m.applicable?'':'Solo apoyo PIE: queda en el informe, no cambia la cuadratura'} checked={selected.has(m.id)} onChange={()=>toggle(m.id)} onClick={e=>e.stopPropagation()}/></td><td><strong>{m.name}</strong><small>{m.rut}</small></td><td>{m.fromName}</td><td>{m.toName}</td><td>{m.destHours>0?`${fmt(m.destHours)} h de clases`:`${fmt(m.destPie)} h de apoyo PIE`}<small>{m.period===2?'Desde agosto':'Desde marzo'}{m.originHours>0?` · mantiene ${fmt(m.originHours)} h en su colegio`:''}</small></td><td><span className="badge blue">{m.kind}</span></td><td className="wrap-cell">{m.subjects.join(', ')}</td></tr>)}</tbody></table></div>:<p className="field-help padded">El modelo no necesita trasladar docentes con estas reglas: cubre el plan con la dotación de cada colegio. Prueba permitir traslados entre comunas o bajar el excedente mínimo.</p>}
-          {selected.size>0&&<div className="selection-bar"><span><strong>{selected.size}</strong> traslado{selected.size>1?'s':''} seleccionado{selected.size>1?'s':''}</span><button className="primary-btn" disabled={stale} onClick={()=>setConfirming(true)}><ArrowRightLeft size={16}/>Aplicar a la demo</button></div>}
-        </section>
-      </>}
-      {tab==='colegio'&&school&&<>
-        <div className="selector-bar"><label><span>Establecimiento</span><select value={schoolId} onChange={e=>setSchoolId(e.target.value)}>{rep.schools.map(x=><option key={x.id} value={x.id}>{x.name} · {x.modality}</option>)}</select></label><button className="link-btn" disabled={busy} onClick={()=>schoolReport(school.id)}>Descargar el informe de este colegio (PDF) <Download size={14}/></button></div>
-        <div className="dashboard-grid">
-          <section className="panel"><div className="panel-heading"><div><h2>Horas por categoría</h2><p>Plan y apoyo PIE en horas pedagógicas; contratos en horas de 60 min</p></div></div><div className="table-scroll"><table><thead><tr><th>CATEGORÍA</th><th>MARZO–JULIO</th><th>AGOSTO–DICIEMBRE</th></tr></thead><tbody>{categoryRows(school).map(([k,a,b])=><tr key={k}><td>{k}</td><td><strong>{a}</strong></td><td><strong>{b}</strong></td></tr>)}</tbody></table></div></section>
-          <section className="panel"><div className="panel-heading"><div><h2>Sugerencias</h2><p>Qué hacer en este establecimiento según la propuesta</p></div></div><ul className="suggestion-list">{school.suggestions.map((x,i)=><li key={i}>{x}</li>)}</ul><div className="panel-footer"><span>Brecha actual {school.gapBefore>0?'+':''}{fmt(school.gapBefore)} h · sin docente {fmt(school.uncoveredBefore)} → {fmt(school.uncoveredAfter)} h</span><button onClick={()=>goPlan(school.id)}>Abrir su cuadratura <ArrowRight size={15}/></button></div></section>
-        </div>
-        <section className="panel module-panel"><div className="panel-heading"><div><h2>Planificación óptima</h2><p>Qué docente hace cada asignatura en cada curso</p></div><Filter label="Periodo"><select value={period} onChange={e=>setPeriod(Number(e.target.value))}>{[1,2].map(t=><option key={t} value={t}>{PERIOD_LABEL[t]}</option>)}</select></Filter></div><div className="table-scroll plan-scroll"><table><thead><tr><th>CURSO</th><th>ASIGNATURA</th><th>HORAS</th><th>DOCENTE</th><th>ORIGEN</th></tr></thead><tbody>{(R.plan[`${school.id}|${period}`]??[]).slice().sort((a,b)=>a.course.localeCompare(b.course,'es')||a.subject.localeCompare(b.subject,'es')).map((r,i)=><tr key={i}><td><strong>{r.course}</strong></td><td>{r.subject}</td><td>{fmt(r.hours)} h</td><td>{r.teacher?r.name:<span className="badge amber">Por contratar</span>}</td><td>{!r.teacher?'—':r.origin===school.id?'Propio':<span className="badge blue">Llega de {rep.schools.find(x=>x.id===r.origin)?.name??r.origin}</span>}</td></tr>)}</tbody></table></div></section>
-        <section className="panel"><div className="panel-heading"><div><h2>Docentes del establecimiento</h2><p>Uso de su capacidad lectiva antes y con la propuesta</p></div></div><TeacherTable rows={rep.teachers.filter(t=>t.origin===school.id||t.otherSchool===school.id)}/></section>
-      </>}
-      {tab==='docentes'&&<>
-        <div className="filter-bar"><SearchBox value={query} change={setQuery} placeholder="Buscar docente, RUT o colegio"/><Filter label="Estado de la carga"><select value={label} onChange={e=>setLabel(e.target.value)}>{['Todos','Con cambios','Eficiente','Aceptable','Ineficiente','Sin clases','No disponible','Apoyo PIE'].map(x=><option key={x}>{x}</option>)}</select></Filter></div>
-        <section className="panel"><div className="panel-heading"><div><h2>Eficiencia de la carga docente</h2><p>{fmt(teachers.length)} docentes · uso = horas de clase (con su proporción no lectiva) / horas de contrato disponibles</p></div></div><TeacherTable rows={teachers.slice((pageN-1)*20,pageN*20)}/><div className="pagination"><span>Mostrando {teachers.length?(pageN-1)*20+1:0}–{Math.min(pageN*20,teachers.length)} de {fmt(teachers.length)}</span><div><button disabled={pageN===1} onClick={()=>setPageN(n=>n-1)}><ArrowLeft size={15}/>Anterior</button><span>{pageN} / {Math.max(1,Math.ceil(teachers.length/20))}</span><button disabled={pageN*20>=teachers.length} onClick={()=>setPageN(n=>n+1)}>Siguiente<ArrowRight size={15}/></button></div></div></section>
-      </>}
-    </>}
-    {confirming&&<Dialog title={`Aplicar ${selected.size} traslado${selected.size>1?'s':''}`} subtitle="Los docentes pasan a hacer esas horas en el colegio de destino. La cuadratura de ambos colegios se recalcula y queda en la bitácora." close={()=>setConfirming(false)}><form onSubmit={e=>{e.preventDefault();if(!reason.trim())return;applyMoves(rep.moves.filter(m=>selected.has(m.id)),reason.trim());setConfirming(false);setSelected(new Set());setReason('');}}><div className="dialog-body form-grid"><div className="full move-list">{rep.moves.filter(m=>selected.has(m.id)).map(m=><span key={m.id}><strong>{m.name}</strong><small>{m.fromName} → {m.toName} · {fmt(m.destHours)} h</small></span>)}</div><label className="full">Motivo<textarea required value={reason} onChange={e=>setReason(e.target.value)} placeholder="Ej.: propuesta del optimizador revisada con la UATP"/></label></div><div className="dialog-actions"><button type="button" className="secondary-btn" onClick={()=>setConfirming(false)}>Cancelar</button><button className="primary-btn">Aplicar traslados <Check size={16}/></button></div></form></Dialog>}
-  </>;
-}
 function TeacherTable({rows}) {
   return <div className="table-scroll"><table><thead><tr><th>DOCENTE</th><th>COLEGIO</th><th>CONTRATO</th><th>LECTIVAS</th><th>USO DE CAPACIDAD</th><th>ESTADO</th><th>SUGERENCIA</th></tr></thead><tbody>{rows.map(t=><tr key={t.id}><td><strong>{t.name}</strong><small>{t.rut}</small></td><td><span className="truncate" title={t.originName}>{t.originName}</span>{t.otherSchoolName&&<small>+ {t.otherSchoolName}</small>}</td><td>{fmt(t.contract)} → <strong>{fmt(t.contractAfter)}</strong> h</td><td>{fmt(t.lectivasBefore)} → <strong>{fmt(t.lectivasAfter)}</strong> h</td><td>{formatPct(t.utilBefore)} → <strong>{formatPct(t.utilAfter)}</strong></td><td><span className={`badge ${LABEL_TONE[t.label]}`}>{t.label}</span>{t.labelBefore!==t.label&&<small>Antes: {t.labelBefore}</small>}</td><td className="wrap-cell">{t.suggestions.join(' ')}</td></tr>)}</tbody></table>{!rows.length&&<Empty/>}</div>;
 }

@@ -10,7 +10,6 @@
     "test": "node --test tests/*.test.mjs"
   },
   "dependencies": {
-    "highs": "^1.15.3",
     "jspdf": "4.2.1",
     "jspdf-autotable": "5.0.8",
     "lucide-react": "1.18.0",
