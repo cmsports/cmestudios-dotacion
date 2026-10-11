@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createSeed, capacityPedagogical, teacherCheck, summarizeSchool, summarizeTracks, summarizeRural, summarizePie, hourBreakdown, computeIndicators, indicatorRows, parseCSV, serializeCSV, validateImport, applyImport, sampleImport} from '../src/core.mjs';
+import {createSeed, capacityPedagogical, teacherCheck, summarizeSchool, summarizeTracks, summarizeRural, summarizePie, hourBreakdown, computeIndicators, indicatorRows, parseCSV, serializeCSV, validateImport, applyImport, sampleImport, suggestReassignments, applyReassignments, movableTeachers} from '../src/core.mjs';
 
 test('scenario covers 52 institutions, 4 microcenters, 25 rural members and 2,200 staff',()=>{
   const s=createSeed(); assert.equal(s.schools.filter(s=>s.modality!=='Microcentro').length,52);
@@ -108,4 +108,11 @@ test('bulk sample spans every modality and upserts by ID, preserving unmentioned
   assert.equal(next.staff.find(p=>p.id===updated.id).protection,'Fuero gremial');
   const untouched=s.staff.find(p=>!rows.some(x=>x.id===p.id));
   assert.deepEqual(next.staff.find(p=>p.id===untouched.id),untouched);
+});
+test('suggested reassignments move hours from surplus to deficit without creating new deficits',()=>{
+  const s=createSeed();const stats=s.schools.map(x=>summarizeSchool(x,s.staff,s.plans));
+  const moves=suggestReassignments(stats,s.staff);assert.ok(moves.length>0);
+  const next=applyReassignments(s,moves);const after=new Map(next.schools.map(x=>[x.id,summarizeSchool(x,next.staff,next.plans)]));
+  for(const st of stats){const a=after.get(st.id);if(st.gap>=-0.01)assert.ok(a.gap>=-0.01,st.id);else assert.ok(a.gap<=0.01&&a.gap>=st.gap-0.01,st.id);}
+  assert.equal(next.staff.length,s.staff.length);assert.ok(moves.every(m=>movableTeachers(s.staff.find(p=>p.id===m.personId))));
 });

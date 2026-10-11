@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { LayoutDashboard, School, UsersRound, BookOpen, UploadCloud, History, ChevronDown, ChevronUp, ArrowUpRight, ArrowRight, Search, Bell, Download, Plus, Check, X, CheckCircle2, AlertTriangle, Building2, SlidersHorizontal, FileSpreadsheet, FileText, Pencil, RotateCcw, ShieldCheck, CircleHelp, ArrowLeft, GraduationCap, Sprout, Layers, Clock3, Menu, BriefcaseBusiness, TrendingUp, Bot, Send, Minus, Maximize2, Minimize2, ChartColumn, UserMinus, UserX, Puzzle, Baby, Wrench, MapPin, Utensils, Scale, UserPlus, FileSignature, Table2, Sparkles, ArrowRightLeft } from 'lucide-react';
-import { MODALITIES, STORAGE_KEY, STATE_VERSION, DEFAULT_SETTINGS, FUNDING, CONTRACTS, RENEWABLE, PROJECTIONS, TP_TRACKS, TEACHER_FUNCTIONS, FULL_TIME, fmt, round, capacityPedagogical, teacherCheck, teacherFunction, assistantCategory, summarizeSchool, summarizeTracks, summarizeRural, summarizePie, vtfLevelsOf, computeIndicators, indicatorRows, createSeed, serializeCSV, parseCSV, validateImport, applyImport, sampleImport } from './core.mjs';
+import { LayoutDashboard, School, UsersRound, BookOpen, UploadCloud, History, ChevronDown, ChevronUp, ArrowUpRight, ArrowRight, Search, Bell, Download, Plus, Check, X, CheckCircle2, AlertTriangle, Building2, SlidersHorizontal, FileSpreadsheet, FileText, Pencil, RotateCcw, ShieldCheck, CircleHelp, ArrowLeft, GraduationCap, Sprout, Layers, Clock3, Menu, BriefcaseBusiness, TrendingUp, ChartColumn, UserMinus, UserX, Puzzle, Baby, Wrench, MapPin, Utensils, Scale, UserPlus, FileSignature, Table2, Sparkles, ArrowRightLeft, ArrowLeftRight } from 'lucide-react';
+import { MODALITIES, STORAGE_KEY, STATE_VERSION, DEFAULT_SETTINGS, FUNDING, CONTRACTS, RENEWABLE, PROJECTIONS, TP_TRACKS, TEACHER_FUNCTIONS, FULL_TIME, fmt, round, capacityPedagogical, teacherCheck, teacherFunction, assistantCategory, summarizeSchool, summarizeTracks, summarizeRural, summarizePie, vtfLevelsOf, computeIndicators, indicatorRows, createSeed, serializeCSV, parseCSV, validateImport, applyImport, sampleImport, movableTeachers, suggestReassignments, applyReassignments } from './core.mjs';
 import { DEFAULT_PPL, PERIOD_LABEL, buildData, partsOf, mergeResults } from './ppl.mjs';
 import { buildReport, formatPct } from './pplReport.mjs';
 import { generalPdf, schoolsPdf, teachersBook, planningBook, categoryRows } from './pplExports.mjs';
@@ -10,7 +10,7 @@ import { BRAND, hasFuero, indicatorsBook, indicatorsPdf, schoolSheetBook, school
 const NAV_GROUPS = [
   ['INICIO', [['overview', 'Vista general', LayoutDashboard]]],
   ['1 · DATOS', [['import', 'Importar datos', UploadCloud], ['schools', 'Establecimientos', School], ['people', 'Dotación', UsersRound]]],
-  ['2 · ANÁLISIS', [['plans', 'Cuadratura', BookOpen], ['optimizer', 'Optimizador', Sparkles], ['indicators', 'Indicadores PAL', ChartColumn]]],
+  ['2 · ANÁLISIS', [['plans', 'Cuadratura', BookOpen], ['optimizer', 'Optimizador', Sparkles], ['reassign', 'Reasignación', ArrowLeftRight], ['indicators', 'Indicadores PAL', ChartColumn]]],
   ['3 · REGISTRO', [['history', 'Bitácora de cambios', History]]],
 ];
 const NAV = NAV_GROUPS.flatMap(g => g[1]);
@@ -20,6 +20,7 @@ const Titles = {
   schools: ['Cada comunidad, su planificación.', 'Elige un establecimiento para abrir su cuadratura.'],
   people: ['Las personas detrás de cada aula.', 'Busca, filtra y abre la ficha de cada persona o cargo vacante.'],
   plans: ['De las horas al equilibrio.', 'Plan de estudios contra horas asignadas, según la modalidad del establecimiento.'],
+  reassign: ['De donde sobra, a donde falta.', 'Mueve docentes de establecimientos con excedente a otros con déficit y revisa el efecto antes de aplicar.'],
   optimizer: ['La mejor repartición posible.', 'El PPL reparte a los docentes entre los colegios con la carga óptima y entrega la planificación de cada establecimiento.'],
   indicators: ['Los números del Plan Anual Local.', 'Indicadores de dotación exigidos por la DEP, calculados en tiempo real.'],
   history: ['Cada decisión deja una huella.', 'Todos los cambios del escenario, con su motivo.'],
@@ -81,7 +82,6 @@ export default function App() {
   const [storageError, setStorageError] = useState(false);
   const [mobileNav, setMobileNav] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [chatOpen, setChatOpen] = useState(false);
   const [selected, setSelected] = useState(() => new Set());
   const [opt, setOpt] = useState({ status: 'idle', params: { ...DEFAULT_PPL }, progress: {}, result: null, ranOn: null });
   useEffect(() => { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); setStorageError(false); } catch { setStorageError(true); } }, [state]);
@@ -277,6 +277,8 @@ export default function App() {
 
         {page==='import'&&<ImportPanel state={state} commit={commit} notify={setNotice} goPeople={()=>{setScope('all');changePage('people');}} readOnly={scope!=='all'}/>}
 
+        {page==='reassign'&&<ReassignPanel stats={stats} state={state} commit={commit} notify={setNotice} readOnly={scope!=='all'}/>}
+
         {page==='history'&&<>
           <section className="panel"><div className="panel-heading"><div><h2>Historial de decisiones</h2><p>{events.length} eventos en este navegador · registro local, no es una auditoría de producción</p></div><ExportMenu busy={busy} items={listMenu('history','bitacora-dotacion-2027','Todos los eventos con fecha, acción y motivo')}/></div><div className="timeline">{events.map(e=><article key={e.id}><span className="timeline-icon"><History size={17}/></span><div><h3>{e.action}</h3><p>{e.detail}</p><small>{e.author} · {new Date(e.date).toLocaleString('es-CL')}</small></div></article>)}</div></section>
           <section className="panel reset-panel"><div><h2>Volver al escenario inicial</h2><p>Borra ajustes, importaciones y bitácora de este navegador y recupera los 2.200 registros ficticios. Útil antes de grabar el video.</p></div><button className="secondary-btn danger" onClick={()=>setModal({type:'reset'})}><RotateCcw size={16}/>Restablecer demo</button></section>
@@ -285,7 +287,6 @@ export default function App() {
       </div>
     </main>
     {notice&&<div className="toast" role="status"><CheckCircle2 size={19}/>{notice}<button onClick={()=>setNotice('')} aria-label="Cerrar aviso"><X size={16}/></button></div>}
-    {!chatOpen&&<button className="chat-launcher" onClick={()=>setChatOpen(true)}><Bot size={18}/>Asistente</button>}
     {modal?.type==='person'&&<EditPerson key={modal.person.id} person={modal.person} isNew={modal.isNew} schools={scope==='all'?state.schools:state.schools.filter(s=>s.id===selectedSchool)} close={()=>setModal(null)} save={p=>savePerson(p,modal.isNew)} download={modal.isNew?null:()=>exportIndividual(modal.person)} busy={busy}/>}
     {modal?.type==='school'&&<EditSchool key={school.id+modal.section} section={modal.section} school={school} summary={summary} vtfCount={state.schools.filter(s=>s.modality==='Jardín VTF').length} close={()=>setModal(null)} save={saveSchool}/>}
     {modal?.type==='plan'&&<EditPlan plan={modal.plan} isNew={modal.isNew} modality={school.modality} close={()=>setModal(null)} save={(p,reason)=>{commit(prev=>({...prev,plans:modal.isNew?[...prev.plans,p]:prev.plans.map(x=>x.id===p.id?p:x)}),modal.isNew?'Asignatura incorporada':'Plan de estudios actualizado',`${school.name}: ${p.subject}${p.track?` (${p.track})`:''}, ${p.groups} cursos × ${p.hoursPerGroup} h. Motivo: ${reason}`);setModal(null);setNotice('Plan guardado. Cuadratura recalculada.');}}/>}
@@ -295,7 +296,6 @@ export default function App() {
     {modal?.type==='alerts'&&<Dialog title="Alertas de planificación" subtitle="Haz clic en una alerta para abrir su cuadratura" close={()=>setModal(null)}><div className="dialog-body"><div className="warning-banner"><AlertTriangle size={18}/>{deficits.length} establecimientos con déficit · {overloads} sobrecargas individuales.</div>{scoped.filter(s=>s.status==='Déficit'||s.status==='Sobrecarga'||s.status==='Por validar').sort((a,b)=>a.gap-b.gap).slice(0,12).map(s=><button className="alert-item" key={s.id} onClick={()=>{goPlan(s.id);setModal(null);}}><div><strong>{s.name}</strong><small>{s.modality==='Jardín VTF'?'Coeficientes VTF pendientes de validación':s.status==='Sobrecarga'?`${s.overloads} docentes con sobrecarga`:`${fmt(s.gap)} h pedagógicas de diferencia`}</small></div><Status value={s.status}/><ArrowRight size={16}/></button>)}</div></Dialog>}
     {modal?.type==='bulkMove'&&<BulkMoveDialog people={state.staff.filter(p=>selected.has(p.id))} schools={state.schools} close={()=>setModal(null)} save={bulkMove}/>}
     {modal?.type==='reset'&&<Dialog title="¿Restablecer el escenario?" subtitle="Se eliminarán ajustes, importaciones y bitácora de esta demo." close={()=>setModal(null)}><div className="dialog-body"><p>Los archivos que ya descargaste se conservan. Esta acción recupera los 2.200 registros ficticios iniciales.</p></div><div className="dialog-actions"><button className="secondary-btn" onClick={()=>setModal(null)}>Cancelar</button><button className="primary-btn" onClick={()=>{setState(createSeed());setModal(null);setNotice('Escenario inicial restablecido.');}}>Restablecer demo</button></div></Dialog>}
-    {chatOpen&&<ChatDrawer close={()=>setChatOpen(false)} scoped={scoped}/>}
   </div>;
 }
 
@@ -569,81 +569,56 @@ function ImportPanel({state,commit,notify,goPeople,readOnly}) {
     {done&&<section className="panel import-success"><CheckCircle2 size={35}/><h2>Datos incorporados</h2><p>{done.added} personas nuevas y {done.updated} actualizadas. El cambio quedó en la bitácora.</p><button className="primary-btn" onClick={goPeople}>Revisar dotación <ArrowRight size={16}/></button></section>}</div><aside className="import-aside"><span className="eyebrow">ANTES DE IMPORTAR</span><h2>Un maestro.<br/>Una fuente de verdad.</h2><p>Esta demo utiliza una estructura propia. Adaptaremos el mapeo al maestro real cuando el SLEP entregue sus insumos.</p><div className="import-check"><CheckCircle2 size={18}/><div><strong>Identificación por ID</strong><p>Valida el RUT con su dígito verificador. Los RUT del ejemplo son ficticios.</p></div></div><div className="import-check"><CheckCircle2 size={18}/><div><strong>Asignación por establecimiento</strong><p>Utiliza EST-001 a EST-056, disponibles en Establecimientos.</p></div></div><div className="import-check"><CheckCircle2 size={18}/><div><strong>Sin cambios parciales</strong><p>Si una fila tiene errores, se bloquea el archivo completo.</p></div></div><div className="import-check"><CheckCircle2 size={18}/><div><strong>Unidades de tiempo</strong><p>Contrato en horas de 60 min; lectivas en horas de 45 min.</p></div></div><div className="column-note"><strong>Columnas obligatorias</strong><code>id · nombre · establecimiento_id · tipo · cargo · horas_contrato · horas_lectivas_pedagogicas · financiamiento · contrato</code><strong className="spaced">Columnas del maestro de remuneraciones (opcionales)</strong><code>rut (con dígito verificador) · estatuto · tramo · fecha_ingreso · fecha_termino · horas_basica · horas_media</code><strong className="spaced">Otras columnas opcionales</strong><code>fuero (Sí/No) · formacion_tp (General/Diferenciada) · escuela_rural</code></div></aside></div>;
 }
 
-function mdToHtml(text) {
-  const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  let html = esc(text);
-  html = html.replace(/^#{1,3} (.*)$/gm, '<strong class="chat-h">$1</strong>');
-  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-  html = html.replace(/(^|\n)((?:[-*] .*(?:\n|$))+)/g, (_, pre, block) => `${pre}<ul>${block.trim().split('\n').map(l => `<li>${l.replace(/^[-*] /, '')}</li>`).join('')}</ul>`);
-  html = html.split(/\n{2,}/).map(p => p.includes('<ul>') || p.includes('chat-h') ? p : `<p>${p}</p>`).join('');
-  return html.replace(/\n/g, '<br/>');
-}
-
-function ChatDrawer({ close, scoped }) {
-  const [messages, setMessages] = useState([{ role: 'assistant', text: 'Hola, soy el asistente de dotación. Pregúntame, por ejemplo: "¿qué establecimientos tienen déficit?" o "resume las sobrecargas".' }]);
-  const [input, setInput] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-  const [minimized, setMinimized] = useState(false);
-  const [big, setBig] = useState(false);
-  const [pos, setPos] = useState(null);
-  const listRef = useRef();
-  const panelRef = useRef();
-  const dragRef = useRef(null);
-  useEffect(() => { listRef.current?.scrollTo({ top: listRef.current.scrollHeight }); }, [messages, busy]);
-  useEffect(() => () => { window.removeEventListener('mousemove', onDragMove); window.removeEventListener('mouseup', onDragEnd); }, []);
-  const context = scoped.map(s => ({ nombre: s.name, modalidad: s.modality, estado: s.status, requeridas: s.required, asignadas: s.assigned, brecha: s.gap, sobrecargas: s.overloads }));
-  const onDragMove = e => {
-    const d = dragRef.current; if (!d) return;
-    const w = panelRef.current.offsetWidth, h = panelRef.current.offsetHeight;
-    const x = Math.min(Math.max(8, d.origX + (e.clientX - d.startX)), window.innerWidth - w - 8);
-    const y = Math.min(Math.max(8, d.origY + (e.clientY - d.startY)), window.innerHeight - h - 8);
-    setPos({ x, y });
+function ReassignPanel({stats,state,commit,notify,readOnly}) {
+  const eligible=stats.filter(s=>s.modality!=='Jardín VTF'&&s.status!=='Por validar');
+  const surplus=eligible.filter(s=>s.gap>0.01).sort((a,b)=>b.gap-a.gap);
+  const deficit=eligible.filter(s=>s.gap<-0.01).sort((a,b)=>a.gap-b.gap);
+  const suggestions=useMemo(()=>suggestReassignments(stats,state.staff),[stats,state.staff]);
+  const [skip,setSkip]=useState(()=>new Set());
+  const [reason,setReason]=useState('');
+  const [error,setError]=useState('');
+  const [from,setFrom]=useState('');const [personId,setPersonId]=useState('');const [to,setTo]=useState('');const [manualReason,setManualReason]=useState('');const [manualError,setManualError]=useState('');
+  const chosen=suggestions.filter(m=>!skip.has(m.personId));
+  const byId=new Map(stats.map(s=>[s.id,s]));
+  const projected=useMemo(()=>{const next=applyReassignments(state,chosen);return state.schools.map(sc=>summarizeSchool(sc,next.staff,next.plans));},[state,chosen]);
+  const stillDeficit=projected.filter(s=>s.modality!=='Jardín VTF'&&s.status==='Déficit').length;
+  const hoursMoved=chosen.reduce((a,m)=>a+m.hours,0);
+  const toggle=id=>setSkip(prev=>{const n=new Set(prev);n.has(id)?n.delete(id):n.add(id);return n;});
+  const applyChosen=()=>{
+    if(!chosen.length)return setError('Selecciona al menos un movimiento.');
+    if(!reason.trim())return setError('Escribe una justificación para registrar la reasignación.');
+    commit(prev=>applyReassignments(prev,chosen),'Reasignación de dotación',`${chosen.length} docentes reasignados (${fmt(hoursMoved)} h lectivas): ${chosen.map(m=>`${m.name} (${m.personId}) ${m.fromId}→${m.toId}`).join('; ')}. Motivo: ${reason}`);
+    setReason('');setError('');setSkip(new Set());notify(`${chosen.length} reasignaciones aplicadas. La cuadratura se recalculó.`);
   };
-  const onDragEnd = () => { dragRef.current = null; window.removeEventListener('mousemove', onDragMove); window.removeEventListener('mouseup', onDragEnd); };
-  const onDragStart = e => {
-    if (e.target.closest('button')) return;
-    const rect = panelRef.current.getBoundingClientRect();
-    dragRef.current = { startX: e.clientX, startY: e.clientY, origX: rect.left, origY: rect.top };
-    window.addEventListener('mousemove', onDragMove);
-    window.addEventListener('mouseup', onDragEnd);
+  const candidates=state.staff.filter(p=>p.schoolId===from&&movableTeachers(p));
+  const person=candidates.find(p=>p.id===personId);
+  const src=byId.get(from),dst=byId.get(to);
+  const manualOk=person&&dst&&from!==to;
+  const applyManual=()=>{
+    if(!manualOk)return setManualError('Elige origen, docente y destino distintos.');
+    if(!manualReason.trim())return setManualError('Escribe una justificación para registrar el movimiento.');
+    commit(prev=>({...prev,staff:prev.staff.map(x=>x.id===person.id?{...x,schoolId:to}:x)}),'Reasignación manual',`${person.name} (${person.id}): ${src.name} → ${dst.name}, ${fmt(person.assignedPed)} h lectivas. Motivo: ${manualReason}`);
+    setPersonId('');setManualReason('');setManualError('');notify('Docente reasignado. La cuadratura se recalculó.');
   };
-  const send = async e => {
-    e.preventDefault();
-    const text = input.trim();
-    if (!text || busy) return;
-    setMessages(m => [...m, { role: 'user', text }]);
-    setInput(''); setBusy(true); setError('');
-    try {
-      const res = await fetch('/api/dotacion-chat', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ message: text, context }) });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Error del servidor');
-      setMessages(m => [...m, { role: 'assistant', text: data.reply }]);
-    } catch (err) {
-      setError('No se pudo contactar al asistente. ¿Está configurada la API key en el servidor?');
-    } finally { setBusy(false); }
-  };
-  const style = pos ? { left: pos.x, top: pos.y, right: 'auto', bottom: 'auto' } : undefined;
-  return <aside className={`chat-drawer ${big ? 'big' : ''} ${minimized ? 'minimized' : ''}`} style={style} ref={panelRef}>
-    <header onMouseDown={onDragStart}>
-      <div className="icon-surface"><Bot size={18}/></div>
-      <div><h2>Asistente de dotación</h2>{!minimized && <p>Claude Haiku · analiza el escenario visible</p>}</div>
-      <div className="chat-controls">
-        <button className="icon-btn" aria-label={minimized ? 'Restaurar' : 'Minimizar'} onClick={()=>setMinimized(m=>!m)}>{minimized ? <ChevronUp size={16}/> : <Minus size={16}/>}</button>
-        <button className="icon-btn" aria-label={big ? 'Reducir' : 'Agrandar'} onClick={()=>setBig(b=>!b)} disabled={minimized}>{big ? <Minimize2 size={15}/> : <Maximize2 size={15}/>}</button>
-        <button className="icon-btn" aria-label="Cerrar asistente" onClick={close}><X size={18}/></button>
-      </div>
-    </header>
-    {!minimized && <>
-      <div className="chat-messages" ref={listRef}>
-        {messages.map((m, i) => m.role === 'assistant' ? <div key={i} className="chat-bubble assistant" dangerouslySetInnerHTML={{ __html: mdToHtml(m.text) }}/> : <div key={i} className="chat-bubble user">{m.text}</div>)}
-        {busy && <div className="chat-bubble assistant chat-typing">Pensando…</div>}
-      </div>
-      {error && <div className="warning-banner chat-error"><AlertTriangle size={16}/>{error}</div>}
-      <form className="chat-input" onSubmit={send}>
-        <input aria-label="Pregúntale al asistente" placeholder="Pregunta sobre déficits, excedentes, sobrecargas…" value={input} onChange={e=>setInput(e.target.value)} disabled={busy}/>
-        <button className="primary-btn" type="submit" disabled={busy || !input.trim()} aria-label="Enviar"><Send size={16}/></button>
-      </form>
-    </>}
-  </aside>;
+  const SchoolList=({rows,sign})=><div className="table-scroll"><table><thead><tr><th>ESTABLECIMIENTO</th><th>COMUNA</th><th>BRECHA (h ped.)</th></tr></thead><tbody>{rows.map(s=><tr key={s.id}><td>{s.name}</td><td>{s.commune}</td><td><strong>{sign}{fmt(Math.abs(s.gap))}</strong></td></tr>)}{!rows.length&&<tr><td colSpan="3">Sin establecimientos.</td></tr>}</tbody></table></div>;
+  return <>
+    {readOnly&&<div className="warning-banner"><ShieldCheck size={17}/>Las reasignaciones están disponibles en la vista Sostenedor. Cambia la vista superior para aplicarlas.</div>}
+    <section className="kpis"><Kpi icon={TrendingUp} title="Excedente total" value={fmt(surplus.reduce((a,s)=>a+s.gap,0))} footer={`${surplus.length} establecimientos · horas pedagógicas`} color="blue"/><Kpi icon={AlertTriangle} title="Déficit total" value={fmt(deficit.reduce((a,s)=>a-s.gap,0))} footer={`${deficit.length} establecimientos · horas pedagógicas`} color="orange"/><Kpi icon={ArrowLeftRight} title="Movimientos sugeridos" value={suggestions.length} footer={`${fmt(suggestions.reduce((a,m)=>a+m.hours,0))} h lectivas por mover`} color="teal"/><Kpi icon={CheckCircle2} title="Déficit tras aplicar" value={stillDeficit} footer="Establecimientos que seguirían en déficit con la selección" color="purple"/></section>
+    <div className="info-banner"><CircleHelp size={18}/><div><strong>Cómo se calcula.</strong><span>Se mueven docentes de aula completos con sus horas lectivas. Ningún origen queda en déficit ni el destino se excede. Se priorizan movimientos dentro de la misma comuna. Se excluyen personas con fuero y los Jardines VTF.</span></div></div>
+    <div className="dashboard-grid"><section className="panel"><div className="panel-heading"><div><h2>Con excedente</h2><p>Horas asignadas sobre el plan</p></div></div><SchoolList rows={surplus} sign="+"/></section><section className="panel"><div className="panel-heading"><div><h2>Con déficit</h2><p>Horas del plan sin cubrir</p></div></div><SchoolList rows={deficit} sign="−"/></section></div>
+    <section className="panel"><div className="panel-heading"><div><h2>Sugerencias de reasignación</h2><p>{chosen.length} de {suggestions.length} seleccionadas · {fmt(hoursMoved)} h lectivas</p></div></div>
+      <div className="table-scroll"><table><thead><tr><th></th><th>DOCENTE</th><th>HORAS LECTIVAS</th><th>ORIGEN</th><th>DESTINO</th><th>COMUNA</th></tr></thead><tbody>{suggestions.map(m=><tr key={m.personId}><td><input type="checkbox" aria-label={`Incluir ${m.name}`} checked={!skip.has(m.personId)} onChange={()=>toggle(m.personId)}/></td><td>{m.name}<br/><small>{m.personId}</small></td><td>{fmt(m.hours)}</td><td>{m.from}</td><td>{m.to}</td><td>{m.sameCommune?'Misma comuna':'Otra comuna'}</td></tr>)}{!suggestions.length&&<tr><td colSpan="6">No hay movimientos posibles con las reglas actuales.</td></tr>}</tbody></table></div>
+      {!readOnly&&suggestions.length>0&&<div className="form-grid" style={{padding:16}}><label className="full">Justificación<textarea value={reason} onChange={e=>setReason(e.target.value)} placeholder="Ej.: cuadratura 2027 entre establecimientos de la misma comuna"/></label>{error&&<p className="error-text full" role="alert">{error}</p>}<div className="full"><button className="primary-btn" onClick={applyChosen}>Aplicar {chosen.length} reasignaciones <Check size={16}/></button></div></div>}
+    </section>
+    <section className="panel"><div className="panel-heading"><div><h2>Reasignación manual</h2><p>Mueve un docente de aula específico entre establecimientos</p></div></div>
+      <div className="form-grid" style={{padding:16}}>
+        <label>Origen<select value={from} onChange={e=>{setFrom(e.target.value);setPersonId('');}}><option value="">Elegir…</option>{eligible.map(s=><option key={s.id} value={s.id}>{s.name} ({s.gap>0?'+':''}{fmt(s.gap)} h)</option>)}</select></label>
+        <label>Docente<select value={personId} onChange={e=>setPersonId(e.target.value)} disabled={!from}><option value="">Elegir…</option>{candidates.map(p=><option key={p.id} value={p.id}>{p.name} · {fmt(p.assignedPed)} h</option>)}</select></label>
+        <label>Destino<select value={to} onChange={e=>setTo(e.target.value)}><option value="">Elegir…</option>{eligible.filter(s=>s.id!==from).map(s=><option key={s.id} value={s.id}>{s.name} ({s.gap>0?'+':''}{fmt(s.gap)} h)</option>)}</select></label>
+        {manualOk&&<div className="full info-inline"><ArrowLeftRight size={17}/>{src.name}: {fmt(src.gap)} → {fmt(round(src.gap-person.assignedPed))} h · {dst.name}: {fmt(dst.gap)} → {fmt(round(dst.gap+person.assignedPed))} h{src.gap-person.assignedPed<-0.01?' · el origen quedaría en déficit':''}</div>}
+        <label className="full">Justificación<textarea value={manualReason} onChange={e=>setManualReason(e.target.value)} placeholder="Motivo del movimiento"/></label>
+        {manualError&&<p className="error-text full" role="alert">{manualError}</p>}
+        <div className="full"><button className="primary-btn" disabled={readOnly} onClick={applyManual}>Mover docente <Check size={16}/></button></div>
+      </div></section>
+  </>;
 }
