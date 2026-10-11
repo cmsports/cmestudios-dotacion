@@ -1,3 +1,4 @@
+import { seedTickets } from './tickets.mjs';
 export const MODALITIES = ['Escuela regular', 'Liceo', 'Técnico profesional', 'Escuela especial', 'Jardín VTF', 'Microcentro'];
 export const STORAGE_KEY = 'cmestudios.dotacion.demo.v2';
 export const STATE_VERSION = 2;
@@ -309,7 +310,7 @@ export function createSeed() {
     staff.push({ id: `VAC-${String(k + 1).padStart(3, '0')}`, name: 'Cargo vacante por proveer', schoolId: s.id, type: 'Docente', role: 'Docente de aula', contractHours, assignedPed: capacityPedagogical(contractHours, s.lectiveRatio), funding: 'General', contract: 'Contrata', protection: '', projection: 'Aumento', changeHours: contractHours, justification: 'Escenario demo: cargo para cubrir déficit de la cuadratura.', vacant: true, ...(s.modality === 'Técnico profesional' ? { track: 'Formación general' } : {}), ...(s.modality === 'Microcentro' ? { ruralSchool: s.ruralMembers[0].name } : {}) });
   });
   const events = [{ id: 'seed', date: new Date().toISOString(), action: 'Escenario de demostración creado', detail: '52 establecimientos, 4 microcentros, 2.200 personas ficticias y cargos vacantes de ejemplo. Sin datos del SLEP.', author: 'CMEstudios · Demo' }];
-  return { version: STATE_VERSION, settings: { ...DEFAULT_SETTINGS }, schools, staff, plans, events };
+  return { version: STATE_VERSION, settings: { ...DEFAULT_SETTINGS }, schools, staff, plans, events, tickets: seedTickets() };
 }
 
 export function serializeCSV(rows) {

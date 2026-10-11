@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { LayoutDashboard, School, UsersRound, BookOpen, UploadCloud, History, ChevronDown, ChevronUp, ArrowUpRight, ArrowRight, Search, Bell, Download, Plus, Check, X, CheckCircle2, AlertTriangle, Building2, SlidersHorizontal, FileSpreadsheet, FileText, Pencil, RotateCcw, ShieldCheck, CircleHelp, ArrowLeft, GraduationCap, Sprout, Layers, Clock3, Menu, BriefcaseBusiness, TrendingUp, ChartColumn, UserMinus, UserX, Puzzle, Baby, Wrench, MapPin, Utensils, Scale, UserPlus, FileSignature, Table2, ArrowRightLeft, ArrowLeftRight } from 'lucide-react';
+import { LifeBuoy, LayoutDashboard, School, UsersRound, BookOpen, UploadCloud, History, ChevronDown, ChevronUp, ArrowUpRight, ArrowRight, Search, Bell, Download, Plus, Check, X, CheckCircle2, AlertTriangle, Building2, SlidersHorizontal, FileSpreadsheet, FileText, Pencil, RotateCcw, ShieldCheck, CircleHelp, ArrowLeft, GraduationCap, Sprout, Layers, Clock3, Menu, BriefcaseBusiness, TrendingUp, ChartColumn, UserMinus, UserX, Puzzle, Baby, Wrench, MapPin, Utensils, Scale, UserPlus, FileSignature, Table2, ArrowRightLeft, ArrowLeftRight } from 'lucide-react';
 import { MODALITIES, STORAGE_KEY, STATE_VERSION, DEFAULT_SETTINGS, FUNDING, CONTRACTS, RENEWABLE, PROJECTIONS, TP_TRACKS, TEACHER_FUNCTIONS, FULL_TIME, fmt, round, capacityPedagogical, teacherCheck, teacherFunction, assistantCategory, summarizeSchool, summarizeTracks, summarizeRural, summarizePie, vtfLevelsOf, computeIndicators, indicatorRows, createSeed, serializeCSV, parseCSV, validateImport, applyImport, sampleImport, movableTeachers, suggestReassignments, applyReassignments } from './core.mjs';
+import { TICKET_SLA_HOURS, TICKET_TYPES, TICKET_STATUS, nextTicketId, seedTickets, ticketSla, ticketStats } from './tickets.mjs';
 import { BRAND, hasFuero, indicatorsBook, indicatorsPdf, schoolSheetBook, schoolSheetPdf, listBook } from './exports.mjs';
 
 // El menú sigue el orden de trabajo: cargar datos, revisar, analizar y dejar registro.
@@ -9,6 +10,7 @@ const NAV_GROUPS = [
   ['1 · DATOS', [['import', 'Importar datos', UploadCloud], ['schools', 'Establecimientos', School], ['people', 'Dotación', UsersRound]]],
   ['2 · ANÁLISIS', [['plans', 'Cuadratura', BookOpen], ['reassign', 'Reasignación', ArrowLeftRight], ['indicators', 'Indicadores PAL', ChartColumn]]],
   ['3 · REGISTRO', [['history', 'Bitácora de cambios', History]]],
+  ['4 · SOPORTE', [['support', 'Mesa de ayuda', LifeBuoy]]],
 ];
 const NAV = NAV_GROUPS.flatMap(g => g[1]);
 const Titles = {
@@ -19,12 +21,13 @@ const Titles = {
   plans: ['De las horas al equilibrio.', 'Plan de estudios contra horas asignadas, según la modalidad del establecimiento.'],
   reassign: ['De donde sobra, a donde falta.', 'Mueve docentes de establecimientos con excedente a otros con déficit y revisa el efecto antes de aplicar.'],
   indicators: ['Los números del Plan Anual Local.', 'Indicadores de dotación exigidos por la DEP, calculados en tiempo real.'],
+  support: ['Una mesa de ayuda, con respuesta en 24 horas.', 'Levanta un requerimiento, sigue su estado y revisa si se respondió dentro del plazo.'],
   history: ['Cada decisión deja una huella.', 'Todos los cambios del escenario, con su motivo.'],
 };
 const SITUATIONS = ['Todas las situaciones', 'Cargos vacantes', 'Disminución', 'No renovación', 'Aumento', 'Con fuero gremial', 'Con sobrecarga'];
 const Status = ({ value }) => <span className={`badge ${value === 'Equilibrado' ? 'green' : value === 'Excedente' ? 'blue' : value === 'Por validar' ? 'neutral' : 'amber'}`}><span className="status-dot" />{value}</span>;
 const ModeIcon = ({ mode, size = 18 }) => { const Icon = mode === 'Jardín VTF' ? Sprout : mode === 'Microcentro' ? Layers : mode === 'Técnico profesional' ? BriefcaseBusiness : GraduationCap; return <Icon size={size} />; };
-function getInitial() { try { const saved = JSON.parse(localStorage.getItem(STORAGE_KEY)); if (saved?.version === STATE_VERSION && Array.isArray(saved.schools) && Array.isArray(saved.staff) && Array.isArray(saved.plans) && Array.isArray(saved.events)) return { ...saved, settings: { ...DEFAULT_SETTINGS, ...saved.settings } }; } catch {} return createSeed(); }
+function getInitial() { try { const saved = JSON.parse(localStorage.getItem(STORAGE_KEY)); if (saved?.version === STATE_VERSION && Array.isArray(saved.schools) && Array.isArray(saved.staff) && Array.isArray(saved.plans) && Array.isArray(saved.events)) return { ...saved, tickets: saved.tickets ?? seedTickets(), settings: { ...DEFAULT_SETTINGS, ...saved.settings } }; } catch {} return createSeed(); }
 const personRole = p => p.type === 'Docente' ? teacherFunction(p.role) : assistantCategory(p.role);
 async function pdfKit() { const { jsPDF } = await import('jspdf'); const { autoTable } = await import('jspdf-autotable'); return { jsPDF, autoTable }; }
 function modalityCopy(school) {
@@ -234,6 +237,8 @@ export default function App() {
 
         {page==='reassign'&&<ReassignPanel stats={stats} state={state} commit={commit} notify={setNotice} readOnly={scope!=='all'}/>}
 
+        {page==='support'&&<SupportPage state={state} setState={setState} notify={setNotice}/>}
+
         {page==='history'&&<>
           <section className="panel"><div className="panel-heading"><div><h2>Historial de decisiones</h2><p>{events.length} eventos en este navegador · registro local, no es una auditoría de producción</p></div><ExportMenu busy={busy} items={listMenu('history','bitacora-dotacion-2027','Todos los eventos con fecha, acción y motivo')}/></div><div className="timeline">{events.map(e=><article key={e.id}><span className="timeline-icon"><History size={17}/></span><div><h3>{e.action}</h3><p>{e.detail}</p><small>{e.author} · {new Date(e.date).toLocaleString('es-CL')}</small></div></article>)}</div></section>
           <section className="panel reset-panel"><div><h2>Volver al escenario inicial</h2><p>Borra ajustes, importaciones y bitácora de este navegador y recupera los 2.200 registros ficticios. Útil antes de grabar el video.</p></div><button className="secondary-btn danger" onClick={()=>setModal({type:'reset'})}><RotateCcw size={16}/>Restablecer demo</button></section>
@@ -331,6 +336,84 @@ function BulkMoveDialog({people,schools,close,save}) {
     <label className="full">Motivo del traslado<textarea value={reason} onChange={e=>setReason(e.target.value)} placeholder="Ej.: cubrir el déficit de Matemática de la Escuela Los Canelos"/></label>
     {error&&<p className="error-text full" role="alert">{error}</p>}
   </div><div className="dialog-actions"><button type="button" className="secondary-btn" onClick={close}>Cancelar</button><button className="primary-btn">Mover {people.length} persona{people.length>1?'s':''} <Check size={16}/></button></div></form></Dialog>;
+}
+
+const TICKET_TONE = { Abierto: 'amber', 'En curso': 'blue', Resuelto: 'green' };
+const fmtDate = ms => new Date(ms).toLocaleString('es-CL', { dateStyle: 'short', timeStyle: 'short' });
+const hoursText = h => h < 1 ? 'menos de 1 h' : `${Math.round(h)} h`;
+function SlaBadge({ t }) {
+  const sla = ticketSla(t);
+  const [tone, text] = sla.state === 'met' ? ['green', 'Respondido en plazo'] : sla.state === 'missed' ? ['amber', 'Respondido fuera de plazo'] : sla.state === 'late' ? ['amber', `Vencido hace ${hoursText(sla.hours)}`] : ['blue', `Responder en ${hoursText(sla.hours)}`];
+  return <span className={`badge ${tone}`}><span className="status-dot"/>{text}</span>;
+}
+function SupportPage({ state, setState, notify }) {
+  const tickets = state.tickets ?? [];
+  const [filter, setFilter] = useState('Todos');
+  const [openId, setOpenId] = useState(null);
+  const [form, setForm] = useState({ type: TICKET_TYPES[0], schoolId: '', subject: '', description: '' });
+  const [error, setError] = useState('');
+  const stats = ticketStats(tickets);
+  const field = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  const update = (id, fn) => setState(prev => ({ ...prev, tickets: (prev.tickets ?? []).map(t => t.id === id ? fn(t) : t) }));
+  const create = e => {
+    e.preventDefault();
+    if (!form.subject.trim() || !form.description.trim()) return setError('Escribe un asunto y describe el requerimiento.');
+    const t = { id: nextTicketId(tickets), createdAt: Date.now(), requester: 'Usuario · Demo', ...form, subject: form.subject.trim(), description: form.description.trim(), status: 'Abierto', firstResponseAt: null, thread: [] };
+    setState(prev => ({ ...prev, tickets: [...(prev.tickets ?? []), t] }));
+    setForm({ type: TICKET_TYPES[0], schoolId: '', subject: '', description: '' }); setError('');
+    notify(`Ticket ${t.id} creado. El soporte responde dentro de ${TICKET_SLA_HOURS} horas.`);
+  };
+  const shown = tickets.filter(t => filter === 'Todos' || t.status === filter).sort((a, b) => b.createdAt - a.createdAt);
+  const open = tickets.find(t => t.id === openId);
+  return <>
+    <section className="kpis">
+      <Kpi icon={LifeBuoy} title="Tickets abiertos" value={stats.open} footer="Abiertos o en curso" color="blue"/>
+      <Kpi icon={CheckCircle2} title="Resueltos" value={stats.resolved} footer="Cerrados con respuesta" color="teal"/>
+      <Kpi icon={Clock3} title="Respuesta en plazo" value={stats.onTimePct === null ? '—' : `${stats.onTimePct}%`} footer={`Meta: primera respuesta en ${TICKET_SLA_HOURS} h`} color="purple"/>
+      <Kpi icon={AlertTriangle} title="Vencidos sin respuesta" value={stats.late} footer="Superaron las 24 horas" color="orange"/>
+    </section>
+    <section className="panel"><div className="panel-heading"><div><h2>Nuevo requerimiento</h2><p>Reporta un error, pide un ajuste de dotación o consulta cómo usar la plataforma</p></div></div>
+      <form onSubmit={create}><div className="form-grid" style={{ padding: 16 }}>
+        <label>Tipo<select value={form.type} onChange={e => field('type', e.target.value)}>{TICKET_TYPES.map(v => <option key={v}>{v}</option>)}</select></label>
+        <label>Establecimiento (opcional)<select value={form.schoolId} onChange={e => field('schoolId', e.target.value)}><option value="">Todo el SLEP / no aplica</option>{state.schools.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
+        <label className="full">Asunto<input value={form.subject} onChange={e => field('subject', e.target.value)} placeholder="Ej.: Renuncia de docente, liberar horas"/></label>
+        <label className="full">Descripción<textarea value={form.description} onChange={e => field('description', e.target.value)} placeholder="Cuéntanos qué necesitas y en qué establecimiento"/></label>
+        {error && <p className="error-text full" role="alert">{error}</p>}
+        <div className="full"><button className="primary-btn" type="submit">Enviar requerimiento <Check size={16}/></button></div>
+      </div></form>
+    </section>
+    <section className="panel"><div className="panel-heading"><div><h2>Requerimientos</h2><p>{shown.length} de {tickets.length} · haz clic en uno para responder o cambiar su estado</p></div>
+      <select aria-label="Filtrar por estado" value={filter} onChange={e => setFilter(e.target.value)}>{['Todos', ...TICKET_STATUS].map(v => <option key={v}>{v}</option>)}</select></div>
+      <div className="table-scroll"><table><thead><tr><th>TICKET</th><th>ASUNTO</th><th>TIPO</th><th>CREADO</th><th>ESTADO</th><th>PLAZO 24 H</th></tr></thead><tbody>
+        {shown.map(t => <tr key={t.id}><td><button className="school-name" onClick={() => setOpenId(t.id)}><strong>{t.id}</strong></button></td><td><button className="school-name" onClick={() => setOpenId(t.id)}><span><strong>{t.subject}</strong><small>{t.requester}{t.schoolId ? ` · ${state.schools.find(s => s.id === t.schoolId)?.name ?? ''}` : ''}</small></span></button></td><td>{t.type}</td><td>{fmtDate(t.createdAt)}</td><td><span className={`badge ${TICKET_TONE[t.status]}`}><span className="status-dot"/>{t.status}</span></td><td><SlaBadge t={t}/></td></tr>)}
+        {!shown.length && <tr><td colSpan="6">No hay requerimientos en este estado.</td></tr>}
+      </tbody></table></div>
+    </section>
+    {open && <TicketDialog key={open.id} t={open} school={state.schools.find(s => s.id === open.schoolId)} close={() => setOpenId(null)} update={fn => update(open.id, fn)}/>}
+  </>;
+}
+function TicketDialog({ t, school, close, update }) {
+  const [text, setText] = useState('');
+  const [by, setBy] = useState('Soporte CMEstudios');
+  const reply = e => {
+    e.preventDefault();
+    if (!text.trim()) return;
+    const now = Date.now();
+    update(x => ({ ...x, thread: [...x.thread, { at: now, by, text: text.trim() }], firstResponseAt: x.firstResponseAt ?? (by === 'Soporte CMEstudios' ? now : null), status: x.status === 'Abierto' && by === 'Soporte CMEstudios' ? 'En curso' : x.status }));
+    setText('');
+  };
+  return <Dialog title={`${t.id} · ${t.subject}`} subtitle={`${t.type} · ${t.requester}${school ? ` · ${school.name}` : ''} · ${fmtDate(t.createdAt)}`} close={close} wide>
+    <div className="dialog-body">
+      <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 12 }}><span className={`badge ${TICKET_TONE[t.status]}`}><span className="status-dot"/>{t.status}</span><SlaBadge t={t}/><span style={{ flex: 1 }}/>{TICKET_STATUS.filter(v => v !== t.status).map(v => <button key={v} type="button" className="secondary-btn" onClick={() => update(x => ({ ...x, status: v }))}>{v === 'Resuelto' ? 'Marcar resuelto' : v === 'Abierto' ? 'Reabrir' : 'Pasar a En curso'}</button>)}</div>
+      <div className="move-list"><span><strong>{t.requester}</strong><small>{fmtDate(t.createdAt)}</small>{t.description}</span>{t.thread.map((m, i) => <span key={i}><strong>{m.by}</strong><small>{fmtDate(m.at)}</small>{m.text}</span>)}</div>
+      <form onSubmit={reply} className="form-grid" style={{ marginTop: 12 }}>
+        <label>Responder como<select value={by} onChange={e => setBy(e.target.value)}><option>Soporte CMEstudios</option><option>Solicitante</option></select></label>
+        <label className="full">Mensaje<textarea value={text} onChange={e => setText(e.target.value)} placeholder="Escribe tu respuesta"/></label>
+        <div className="full"><button className="primary-btn" type="submit" disabled={!text.trim()}>Enviar respuesta <Check size={16}/></button></div>
+      </form>
+    </div>
+    <div className="dialog-actions"><button type="button" className="secondary-btn" onClick={close}>Cerrar</button></div>
+  </Dialog>;
 }
 
 function TeacherTable({rows}) {
