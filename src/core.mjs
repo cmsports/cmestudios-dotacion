@@ -7,6 +7,20 @@ export const RENEWABLE = ['Plazo fijo', 'Contrata'];
 export const PROJECTIONS = ['Mantención', 'Aumento', 'Disminución', 'No renovación'];
 export const TP_TRACKS = ['Formación general', 'Formación diferenciada TP'];
 export const TEACHER_FUNCTIONS = ['Docente de aula', 'Directiva', 'Técnico-pedagógica'];
+// Campos del Maestro de Remuneraciones (bases técnicas, insumos del Servicio Local).
+export const STATUTES = ['Estatuto Docente', 'Ley 21.109', 'Código del Trabajo'];
+export const TRAMOS = ['Inicial', 'Temprano', 'Avanzado', 'Experto I', 'Experto II'];
+// RUT con dígito verificador módulo 11. Los del escenario son ficticios y quedan fuera del rango de personas naturales.
+export function rutDv(body) { let sum = 0, factor = 2; for (const d of String(body).split('').reverse()) { sum += Number(d) * factor; factor = factor === 7 ? 2 : factor + 1; } const r = 11 - (sum % 11); return r === 11 ? '0' : r === 10 ? 'K' : String(r); }
+export const formatRut = body => `${String(body).replace(/\B(?=(\d{3})+(?!\d))/g, '.')}-${rutDv(body)}`;
+export function parseRut(text) { const m = String(text).replace(/[.\s]/g, '').toUpperCase().match(/^(\d{7,8})-?([\dK])$/); return m && rutDv(m[1]) === m[2] ? formatRut(m[1]) : null; }
+// Acepta AAAA-MM-DD o DD-MM-AAAA (también con /) y devuelve AAAA-MM-DD, o null si la fecha no existe.
+export function parseDate(text) {
+  const t = String(text).trim(); let m = t.match(/^(\d{4})-(\d{2})-(\d{2})$/); let y, mo, d;
+  if (m) [, y, mo, d] = m; else if ((m = t.match(/^(\d{2})[-/](\d{2})[-/](\d{4})$/))) [, d, mo, y] = m; else return null;
+  const date = new Date(Date.UTC(+y, +mo - 1, +d));
+  return date.getUTCFullYear() === +y && date.getUTCMonth() === +mo - 1 && date.getUTCDate() === +d ? `${y}-${mo}-${d}` : null;
+}
 export const ASSISTANT_CATEGORIES = ['Profesional', 'Técnica', 'Administrativa', 'Auxiliar'];
 export const FULL_TIME = 44;
 // Parámetros de escenario, editables desde Indicadores. No son valores normativos validados.
@@ -279,6 +293,9 @@ export function createSeed() {
       const person = { id: `DEMO-${String(i + 1).padStart(4, '0')}`, name: `${first[i % 20]} ${last[Math.floor(i / 20) % 17]} ${last[(Math.floor(i / 340) + 5) % 17]}`, schoolId: school.id, type, role, contractHours, assignedPed, funding, contract, protection, projection, changeHours, justification, vacant: false };
       if (isTeacher && school.modality === 'Técnico profesional') person.track = k % 5 < 2 ? 'Formación diferenciada TP' : 'Formación general';
       if (school.modality === 'Microcentro') person.ruralSchool = school.ruralMembers[k % school.ruralMembers.length].name;
+      const media = ['Liceo', 'Técnico profesional'].includes(school.modality);
+      Object.assign(person, { rut: formatRut(45000000 + i * 37 + 11), statute: vtf ? 'Código del Trabajo' : isTeacher ? 'Estatuto Docente' : 'Ley 21.109', startDate: `${2001 + (i * 7) % 25}-${String(i % 12 + 1).padStart(2, '0')}-01`, endDate: contract === 'Plazo fijo' ? (i % 4 ? '2026-12-31' : '2027-02-28') : '' });
+      if (isTeacher && !vtf) Object.assign(person, { tramo: TRAMOS[(i * 3) % 5], hoursBasic: media ? 0 : contractHours, hoursMedia: media ? contractHours : 0 });
       staff.push(person);
     }
   });
@@ -328,10 +345,10 @@ export function parseCSV(text) {
 }
 
 export const CSV_HEADERS = ['id', 'nombre', 'establecimiento_id', 'tipo', 'cargo', 'horas_contrato', 'horas_lectivas_pedagogicas', 'financiamiento', 'contrato'];
-export const CSV_OPTIONAL = ['fuero', 'formacion_tp', 'escuela_rural'];
+export const CSV_OPTIONAL = ['rut', 'estatuto', 'tramo', 'fecha_ingreso', 'fecha_termino', 'horas_basica', 'horas_media', 'fuero', 'formacion_tp', 'escuela_rural'];
 const TRACK_ALIASES = { general: 'Formación general', 'formación general': 'Formación general', 'formacion general': 'Formación general', diferenciada: 'Formación diferenciada TP', 'formación diferenciada tp': 'Formación diferenciada TP', 'formacion diferenciada tp': 'Formación diferenciada TP' };
 export function validateImport(rows, state) {
-  const errors = []; const people = []; const seen = new Set();
+  const errors = []; const people = []; const seen = new Set(); const seenRut = new Set();
   if (rows.length === 0) return { errors: ['El archivo no contiene personas.'], people: [] };
   for (const h of CSV_HEADERS) if (!(h in rows[0])) errors.push(`Falta la columna ${h}.`);
   if (errors.length) return { errors, people };
@@ -358,9 +375,29 @@ export function validateImport(rows, state) {
     const rural = (r.escuela_rural ?? '').trim();
     if (rural && school && school.modality !== 'Microcentro') errors.push(`Fila ${line}: escuela rural solo aplica a microcentros.`);
     else if (rural && school && !school.ruralMembers.some(m => m.name === rural)) errors.push(`Fila ${line}: la escuela rural "${rural}" no pertenece a ${school.name}.`);
+    const rutText = (r.rut ?? '').trim(); const rut = rutText ? parseRut(rutText) : null;
+    if (rutText && !rut) errors.push(`Fila ${line}: el RUT ${rutText} no es válido (revisa el dígito verificador).`);
+    if (rut && seenRut.has(rut)) errors.push(`Fila ${line}: RUT ${rut} repetido dentro del archivo.`);
+    if (rut) seenRut.add(rut);
+    const startText = (r.fecha_ingreso ?? '').trim(), endText = (r.fecha_termino ?? '').trim();
+    const startDate = startText ? parseDate(startText) : null, endDate = endText ? parseDate(endText) : null;
+    if (startText && !startDate) errors.push(`Fila ${line}: fecha de ingreso inválida (usa AAAA-MM-DD o DD-MM-AAAA).`);
+    if (endText && !endDate) errors.push(`Fila ${line}: fecha de término inválida (usa AAAA-MM-DD o DD-MM-AAAA).`);
+    if (startDate && endDate && endDate < startDate) errors.push(`Fila ${line}: la fecha de término es anterior a la de ingreso.`);
+    const statute = (r.estatuto ?? '').trim();
+    if (statute && !STATUTES.includes(statute)) errors.push(`Fila ${line}: estatuto debe ser ${STATUTES.join(', ')}.`);
+    const tramo = (r.tramo ?? '').trim();
+    if (tramo && !TRAMOS.includes(tramo)) errors.push(`Fila ${line}: tramo debe ser ${TRAMOS.join(', ')}.`);
+    else if (tramo && r.tipo === 'Asistente') errors.push(`Fila ${line}: el tramo de desarrollo profesional solo aplica a docentes.`);
+    const basicText = (r.horas_basica ?? '').trim(), mediaText = (r.horas_media ?? '').trim();
+    const hoursBasic = basicText ? number(basicText) : undefined, hoursMedia = mediaText ? number(mediaText) : undefined;
+    if ((basicText && !(hoursBasic >= 0)) || (mediaText && !(hoursMedia >= 0))) errors.push(`Fila ${line}: horas básica y media deben ser números mayores o iguales a 0.`);
+    else if ((basicText || mediaText) && Number.isFinite(contractHours) && Math.abs((hoursBasic ?? 0) + (hoursMedia ?? 0) - contractHours) > 0.01) errors.push(`Fila ${line}: horas básica + media (${(hoursBasic ?? 0) + (hoursMedia ?? 0)}) deben sumar las horas de contrato (${contractHours}).`);
     const old = state.staff.find(p => p.id === r.id);
     const sameSchool = old?.schoolId === r.establecimiento_id;
-    people.push({ ...old, id: r.id, name: r.nombre, schoolId: r.establecimiento_id, type: r.tipo, role: r.cargo, contractHours, assignedPed, funding: r.financiamiento, contract: r.contrato, protection: fuero ? (fuero === 'no' ? '' : 'Fuero gremial') : old?.protection || '', projection: old?.projection || 'Mantención', changeHours: old?.changeHours || 0, justification: old?.justification || '', vacant: false, track: track ?? (sameSchool ? old?.track : undefined), ruralSchool: rural || (sameSchool ? old?.ruralSchool : undefined) });
+    // Columna presente en el archivo: manda su valor, aunque venga vacío. Columna ausente: se conserva lo anterior.
+    const pick = (key, value, previous) => key in r ? value : previous;
+    people.push({ ...old, id: r.id, name: r.nombre, schoolId: r.establecimiento_id, type: r.tipo, role: r.cargo, contractHours, assignedPed, funding: r.financiamiento, contract: r.contrato, protection: fuero ? (fuero === 'no' ? '' : 'Fuero gremial') : old?.protection || '', projection: old?.projection || 'Mantención', changeHours: old?.changeHours || 0, justification: old?.justification || '', vacant: false, track: track ?? (sameSchool ? old?.track : undefined), ruralSchool: rural || (sameSchool ? old?.ruralSchool : undefined), rut: pick('rut', rut ?? undefined, old?.rut), statute: pick('estatuto', statute || undefined, old?.statute), tramo: pick('tramo', tramo || undefined, old?.tramo), startDate: pick('fecha_ingreso', startDate ?? undefined, old?.startDate), endDate: pick('fecha_termino', endDate ?? '', old?.endDate), hoursBasic: pick('horas_basica', hoursBasic, old?.hoursBasic), hoursMedia: pick('horas_media', hoursMedia, old?.hoursMedia) });
   });
   return { errors, people };
 }
@@ -374,10 +411,11 @@ export function applyImport(state, people) {
 export function sampleImport() {
   const seed = createSeed();
   const rows = [];
-  const row = (p, changes = {}) => ({ id: p.id, nombre: p.name, establecimiento_id: p.schoolId, tipo: p.type, cargo: p.role, horas_contrato: p.contractHours, horas_lectivas_pedagogicas: p.assignedPed, financiamiento: p.funding, contrato: p.contract, fuero: p.protection ? 'Sí' : 'No', formacion_tp: p.track === 'Formación diferenciada TP' ? 'Diferenciada' : p.track ? 'General' : '', escuela_rural: p.ruralSchool || '', ...changes });
+  const row = (p, changes = {}) => ({ id: p.id, rut: p.rut ?? '', nombre: p.name, establecimiento_id: p.schoolId, tipo: p.type, cargo: p.role, estatuto: p.statute ?? '', tramo: p.tramo ?? '', contrato: p.contract, fecha_ingreso: p.startDate ?? '', fecha_termino: p.endDate ?? '', horas_contrato: p.contractHours, horas_basica: p.hoursBasic ?? '', horas_media: p.hoursMedia ?? '', horas_lectivas_pedagogicas: p.assignedPed, financiamiento: p.funding, fuero: p.protection ? 'Sí' : 'No', formacion_tp: p.track === 'Formación diferenciada TP' ? 'Diferenciada' : p.track ? 'General' : '', escuela_rural: p.ruralSchool || '', ...changes });
   seed.staff.filter(p => !p.vacant).filter((_, i) => i % 12 === 0).forEach((p, k) => {
     const grow = p.type === 'Docente' && k % 9 === 0 && p.contractHours < 44;
-    rows.push(row(p, grow ? { horas_contrato: Math.min(44, p.contractHours + 2) } : {}));
+    const h = Math.min(44, p.contractHours + 2);
+    rows.push(row(p, grow ? { horas_contrato: h, ...(p.hoursBasic === undefined ? {} : p.hoursMedia ? { horas_media: h } : { horas_basica: h }) } : {}));
   });
   const names = ['Elena Ejemplo Demo', 'Jorge Ejemplo Demo', 'Marta Prueba Demo', 'Luis Muestra Demo', 'Carla Ficticia Demo', 'Raúl Ensayo Demo'];
   for (let k = 0; k < 60; k++) {
@@ -386,7 +424,8 @@ export function sampleImport() {
     const contractHours = [30, 36, 44, 24][k % 4];
     const assignedPed = teacher && !vtf ? round(capacityPedagogical(contractHours, s.lectiveRatio) * 0.9) : 0;
     const cargo = vtf ? teacher ? 'Educadora de párvulos' : 'Técnica en párvulos' : teacher ? 'Docente de aula' : ['Asistente de aula', 'Administrativo', 'Auxiliar', 'Profesional PIE'][k % 4];
-    rows.push({ id: `IMPORT-${String(k + 1).padStart(4, '0')}`, nombre: names[k % names.length].replace('Demo', `Demo ${k + 1}`), establecimiento_id: s.id, tipo: teacher ? 'Docente' : 'Asistente', cargo, horas_contrato: contractHours, horas_lectivas_pedagogicas: assignedPed, financiamiento: vtf ? 'VTF' : cargo === 'Profesional PIE' ? 'PIE' : k % 5 === 0 ? 'SEP' : 'General', contrato: k % 4 === 0 ? 'Plazo fijo' : 'Contrata', fuero: 'No', formacion_tp: teacher && s.modality === 'Técnico profesional' ? k % 2 ? 'Diferenciada' : 'General' : '', escuela_rural: s.modality === 'Microcentro' ? s.ruralMembers[k % s.ruralMembers.length].name : '' });
+    const media = ['Liceo', 'Técnico profesional'].includes(s.modality); const docente = teacher && !vtf;
+    rows.push({ id: `IMPORT-${String(k + 1).padStart(4, '0')}`, rut: formatRut(46000000 + k * 53 + 7), nombre: names[k % names.length].replace('Demo', `Demo ${k + 1}`), establecimiento_id: s.id, tipo: teacher ? 'Docente' : 'Asistente', cargo, estatuto: vtf ? 'Código del Trabajo' : teacher ? 'Estatuto Docente' : 'Ley 21.109', tramo: docente ? TRAMOS[k % 3] : '', contrato: k % 4 === 0 ? 'Plazo fijo' : 'Contrata', fecha_ingreso: '2027-03-01', fecha_termino: k % 4 === 0 ? '2027-12-31' : '', horas_contrato: contractHours, horas_basica: docente ? (media ? 0 : contractHours) : '', horas_media: docente ? (media ? contractHours : 0) : '', horas_lectivas_pedagogicas: assignedPed, financiamiento: vtf ? 'VTF' : cargo === 'Profesional PIE' ? 'PIE' : k % 5 === 0 ? 'SEP' : 'General', fuero: 'No', formacion_tp: teacher && s.modality === 'Técnico profesional' ? k % 2 ? 'Diferenciada' : 'General' : '', escuela_rural: s.modality === 'Microcentro' ? s.ruralMembers[k % s.ruralMembers.length].name : '' });
   }
   return serializeCSV(rows);
 }

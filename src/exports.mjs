@@ -45,8 +45,8 @@ export function schoolSheet(state, id) {
     vtf && { sheet: 'Coeficientes VTF', title: 'Coeficientes por nivel (escenario)', head: ['Nivel', 'Matrícula', 'Niños por educadora', 'Niños por técnica'], body: vtfLevelsOf(school).map(l => [l.level, l.enrollment, l.educatorPerChildren ?? 'Por validar', l.technicianPerChildren ?? 'Por validar']) },
     pie && { sheet: 'PIE', title: 'Programa de Integración Escolar', head: ['Cursos PIE', 'NEE transitorias', 'NEE permanentes', 'Horas requeridas', 'Horas docentes PIE', 'Brecha'], body: [[pie.courses, pie.neet, pie.neep, fmt(pie.required), fmt(pie.assigned), fmt(pie.gap)]] },
     !vtf && { sheet: 'Plan de estudios', title: 'Plan de estudios (escenario)', head: ['Asignatura', 'Cursos', 'Horas por curso', 'Total (45 min)'], body: state.plans.filter(p => p.schoolId === id).map(p => [p.subject + (p.track === 'Formación diferenciada TP' ? ' (diferenciada TP)' : ''), p.groups, p.hoursPerGroup, fmt(p.groups * p.hoursPerGroup)]) },
-    { sheet: 'Docentes', title: 'Dotación docente', head: ['ID', 'Nombre', 'Función', 'Cargo', 'Contrato', 'Horas contrato', 'Lectivas (45 min)', 'Financ.', 'Fuero', 'Proyección'], body: people.filter(p => p.type === 'Docente').map(p => [p.id, p.name, teacherFunction(p.role), [p.role, p.track, p.ruralSchool].filter(Boolean).join(' | '), p.contract, p.contractHours, fmt(p.assignedPed), p.funding, hasFuero(p) ? 'Sí' : 'No', adjust(p)]) },
-    { sheet: 'Asistentes', title: 'Asistentes de la educación', head: ['ID', 'Nombre', 'Categoría', 'Cargo', 'Contrato', 'Horas contrato', 'Financ.', 'Fuero', 'Proyección'], body: people.filter(p => p.type === 'Asistente').map(p => [p.id, p.name, assistantCategory(p.role), p.role, p.contract, p.contractHours, p.funding, hasFuero(p) ? 'Sí' : 'No', adjust(p)]) },
+    { sheet: 'Docentes', title: 'Dotación docente', head: ['RUT / ID', 'Nombre', 'Función', 'Cargo', 'Contrato', 'Horas contrato', 'Lectivas (45 min)', 'Financ.', 'Fuero', 'Proyección'], body: people.filter(p => p.type === 'Docente').map(p => [p.rut || p.id, p.name, teacherFunction(p.role), [p.role, p.track, p.ruralSchool].filter(Boolean).join(' | '), p.contract, p.contractHours, fmt(p.assignedPed), p.funding, hasFuero(p) ? 'Sí' : 'No', adjust(p)]) },
+    { sheet: 'Asistentes', title: 'Asistentes de la educación', head: ['RUT', 'Nombre', 'Categoría', 'Cargo', 'Contrato', 'Horas contrato', 'Financ.', 'Fuero', 'Proyección'], body: people.filter(p => p.type === 'Asistente').map(p => [p.rut || p.id, p.name, assistantCategory(p.role), p.role, p.contract, p.contractHours, p.funding, hasFuero(p) ? 'Sí' : 'No', adjust(p)]) },
   ].filter(Boolean);
   return { school, resumen, tables };
 }
@@ -133,6 +133,7 @@ function peopleColumns(byId) {
   const isTeacher = p => p.type === 'Docente';
   return [
     { key: 'id', label: 'ID', width: 11, value: p => p.id },
+    { key: 'rut', label: 'RUT', width: 13, value: p => p.rut },
     { key: 'name', label: 'Nombre', width: 28, value: p => p.name },
     { key: 'sid', label: 'ID establecimiento', width: 11, value: p => p.schoolId },
     { key: 'school', label: 'Establecimiento', width: 30, value: p => sch(p)?.name },
@@ -140,8 +141,14 @@ function peopleColumns(byId) {
     { key: 'type', label: 'Tipo', width: 10, value: p => p.type },
     { key: 'role', label: 'Cargo', width: 24, value: p => p.role },
     { key: 'fn', label: 'Función o categoría', width: 20, value: p => isTeacher(p) ? teacherFunction(p.role) : assistantCategory(p.role) },
+    { key: 'statute', label: 'Estatuto', width: 17, value: p => p.statute },
+    { key: 'tramo', label: 'Tramo', width: 11, value: p => p.tramo },
     { key: 'contract', label: 'Contrato', width: 11, value: p => p.contract },
+    { key: 'start', label: 'Fecha de ingreso', width: 12, value: p => p.startDate },
+    { key: 'end', label: 'Fecha de término', width: 12, value: p => p.endDate },
     { key: 'h', label: 'Horas contrato (60 min)', width: 13, z: HOURS, total: true, value: p => p.contractHours },
+    { key: 'hb', label: 'Horas básica (60 min)', width: 11, z: HOURS, total: true, value: p => p.hoursBasic },
+    { key: 'hm', label: 'Horas media (60 min)', width: 11, z: HOURS, total: true, value: p => p.hoursMedia },
     { key: 'lect', label: 'Lectivas asignadas (45 min)', width: 13, z: HOURS, total: true, value: p => isTeacher(p) ? p.assignedPed : null },
     { key: 'ratio', label: 'Proporción lectiva', width: 11, z: PCT, value: p => isTeacher(p) ? sch(p)?.lectiveRatio : null },
     { key: 'cap', label: 'Capacidad lectiva (45 min)', width: 13, z: HOURS, total: true, value: p => isTeacher(p) ? capacityPedagogical(p.contractHours, sch(p)?.lectiveRatio) : null, formula: (p, at) => isTeacher(p) ? `ROUND(${at('h')}*${at('ratio')}*60/45,2)` : null },
@@ -212,7 +219,7 @@ export function schoolSheetBook(state, id, XLSX) {
   const base = peopleColumns(byId);
   const tCols = base.filter(c => !['sid', 'school', 'mode', 'type', 'track', 'rural'].includes(c.key));
   tCols.splice(tCols.findIndex(c => c.key === 'contract'), 0, { key: 'grp', label: tp ? 'Formación TP' : micro ? 'Escuela rural' : 'Formación o escuela', width: 26, value: p => p.track || p.ruralSchool });
-  const aCols = base.filter(c => ['id', 'name', 'fn', 'role', 'contract', 'h', 'funding', 'fuero', 'proj', 'adj'].includes(c.key));
+  const aCols = base.filter(c => ['id', 'rut', 'name', 'fn', 'role', 'statute', 'contract', 'start', 'end', 'h', 'funding', 'fuero', 'proj', 'adj'].includes(c.key));
   const pCols = planColumns(tp);
   const D = 'Docentes', A = 'Asistentes', P = 'Plan de estudios';
   const vac = wholeCol(D, tCols, 'vac');
