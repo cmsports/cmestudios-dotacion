@@ -141,3 +141,43 @@ export function sampleImport() {
     { id: 'IMPORT-0002', nombre: 'Jorge Ejemplo Demo', establecimiento_id: 'EST-039', tipo: 'Asistente', cargo: 'Técnica en párvulos', horas_contrato: 44, horas_lectivas_pedagogicas: 0, financiamiento: 'General', contrato: 'Indefinido' }
   ]);
 }
+
+// Reasignación: mueve docentes de aula completos (con sus horas lectivas) desde
+// establecimientos con excedente hacia otros con déficit. Solo planes curriculares
+// (excluye Jardín VTF). No deja a ningún origen en déficit ni sobrepasa la brecha del destino.
+const EPS = 0.01;
+export function movableTeachers(person) {
+  return person.type === 'Docente' && person.role === 'Docente de aula' && person.assignedPed > 0 && !person.protection;
+}
+export function suggestReassignments(stats, staff) {
+  const gaps = new Map(stats.filter(s => s.modality !== 'Jardín VTF' && s.status !== 'Por validar').map(s => [s.id, s.gap]));
+  const byId = new Map(stats.map(s => [s.id, s]));
+  const pool = new Map();
+  staff.filter(movableTeachers).forEach(p => { if (gaps.has(p.schoolId)) { if (!pool.has(p.schoolId)) pool.set(p.schoolId, []); pool.get(p.schoolId).push(p); } });
+  pool.forEach(list => list.sort((a, b) => b.assignedPed - a.assignedPed));
+  const targets = [...gaps].filter(([, g]) => g < -EPS).sort((a, b) => a[1] - b[1]);
+  const moves = [];
+  for (const [toId] of targets) {
+    const to = byId.get(toId);
+    const sources = [...gaps].filter(([, g]) => g > EPS).map(([id]) => byId.get(id))
+      .sort((a, b) => (a.commune === to.commune ? 0 : 1) - (b.commune === to.commune ? 0 : 1) || gaps.get(b.id) - gaps.get(a.id));
+    for (const from of sources) {
+      for (const p of pool.get(from.id) || []) {
+        if (p.moved) continue;
+        const need = -gaps.get(toId), spare = gaps.get(from.id);
+        if (need <= EPS) break;
+        if (p.assignedPed > need + EPS || p.assignedPed > spare + EPS) continue;
+        p.moved = true;
+        gaps.set(toId, round(gaps.get(toId) + p.assignedPed));
+        gaps.set(from.id, round(gaps.get(from.id) - p.assignedPed));
+        moves.push({ personId: p.id, name: p.name, hours: p.assignedPed, fromId: from.id, from: from.name, toId, to: to.name, sameCommune: from.commune === to.commune });
+      }
+    }
+  }
+  staff.forEach(p => { delete p.moved; });
+  return moves;
+}
+export function applyReassignments(state, moves) {
+  const dest = new Map(moves.map(m => [m.personId, m.toId]));
+  return { ...state, staff: state.staff.map(p => dest.has(p.id) ? { ...p, schoolId: dest.get(p.id) } : p) };
+}
