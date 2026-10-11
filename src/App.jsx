@@ -318,8 +318,8 @@ function EditPerson({person,isNew,schools,close,save,download,busy}) {
     {tp&&<label className="full">Formación (liceo TP)<select value={p.track||''} onChange={e=>field('track',e.target.value)}><option value="" disabled>Selecciona</option>{TP_TRACKS.map(t=><option key={t}>{t}</option>)}</select></label>}
     {micro&&<label className="full">Escuela rural<select value={p.ruralSchool||''} onChange={e=>field('ruralSchool',e.target.value||undefined)}><option value="">Sin escuela asignada</option>{school.ruralMembers.map(m=><option key={m.name}>{m.name}</option>)}</select></label>}
     <p className="form-section full">Jornada</p>
-    <label>Horas de contrato (60 min)<input type="number" min="0.1" max="44" step="0.1" required value={p.contractHours} onChange={e=>field('contractHours',number(e.target.value))}/></label>
-    <label>Lectivas asignadas (45 min)<input type="number" min="0" step="0.1" required disabled={p.type==='Asistente'} value={p.assignedPed} onChange={e=>field('assignedPed',number(e.target.value))}/></label>
+    <label>Horas de contrato (60 min)<input type="number" min="0.1" max="44" step="any" required value={p.contractHours} onChange={e=>field('contractHours',number(e.target.value))}/></label>
+    <label>Lectivas asignadas (45 min)<input type="number" min="0" step="any" required disabled={p.type==='Asistente'} value={p.assignedPed} onChange={e=>field('assignedPed',number(e.target.value))}/></label>
     {p.type==='Docente'&&<div className={`full ${check.excess>0?'warning-banner':'info-inline'}`}><AlertTriangle size={17}/>{check.excess>0?`Sobrecarga: ${fmt(check.excess)} h sobre el máximo configurado.`:`Capacidad lectiva configurada: ${fmt(check.capacity)} h pedagógicas.`}</div>}
     <p className="form-section full">Contrato</p>
     <label>Tipo de contrato<select value={p.contract} onChange={e=>field('contract',e.target.value)}>{CONTRACTS.map(v=><option key={v}>{v}</option>)}</select></label>
@@ -327,7 +327,7 @@ function EditPerson({person,isNew,schools,close,save,download,busy}) {
     {!p.vacant&&<label className="full">Fuero<select value={hasFuero(p)?'Fuero gremial':''} onChange={e=>field('protection',e.target.value)}><option value="">Sin fuero</option><option>Fuero gremial</option></select></label>}
     <p className="form-section full">Proyección 2027</p>
     <label className={needsHours?'':'full'}>Proyección<select value={p.projection} onChange={e=>field('projection',e.target.value)}>{PROJECTIONS.map(v=><option key={v} disabled={v==='No renovación'&&(p.vacant||!RENEWABLE.includes(p.contract))}>{v}</option>)}</select></label>
-    {needsHours&&<label>{p.projection==='Aumento'?'Horas a aumentar (60 min)':'Horas a suprimir (60 min)'}<input type="number" min="0.5" max="44" step="0.5" required value={Number.isFinite(p.changeHours)&&p.changeHours>0?p.changeHours:''} onChange={e=>field('changeHours',number(e.target.value))}/></label>}
+    {needsHours&&<label>{p.projection==='Aumento'?'Horas a aumentar (60 min)':'Horas a suprimir (60 min)'}<input type="number" min="0.5" max="44" step="any" required value={Number.isFinite(p.changeHours)&&p.changeHours>0?p.changeHours:''} onChange={e=>field('changeHours',number(e.target.value))}/></label>}
     {risky&&<div className="full warning-banner"><Scale size={17}/>Persona con fuero gremial: una disminución o no renovación requiere revisión jurídica antes de aplicarse.</div>}
     <label className="full">Justificación del cambio<textarea required value={p.justification} onChange={e=>field('justification',e.target.value)} placeholder={p.vacant?'Ej.: cubrir el déficit de Matemática en 7° y 8° básico':'Ej.: ajuste de escenario por cambio de matrícula'}/></label>
     {error&&<p className="error-text full" role="alert">{error}</p>}
@@ -379,7 +379,7 @@ function EditPlan({plan,isNew,modality,close,save}) {
     {tp&&<label>Formación<select value={p.track||'Formación general'} onChange={e=>setP({...p,track:e.target.value})}>{TP_TRACKS.map(t=><option key={t}>{t}</option>)}</select></label>}
     {diff&&<label>Especialidad<input value={p.specialty||''} onChange={e=>setP({...p,specialty:e.target.value})} placeholder="Ej.: Electricidad"/></label>}
     <label>Cursos o grupos<input type="number" required min="1" max="100" step="1" disabled={micro} value={p.groups} onChange={e=>setP({...p,groups:e.target.value===''?NaN:Number(e.target.value)})}/>{micro&&<small>Suma de los cursos combinados de las escuelas rurales; se edita en Parámetros.</small>}</label>
-    <label>Horas pedagógicas por curso<input type="number" required min="0" max="100" step="0.1" value={p.hoursPerGroup} onChange={e=>setP({...p,hoursPerGroup:e.target.value===''?NaN:Number(e.target.value)})}/></label>
+    <label>Horas pedagógicas por curso<input type="number" required min="0" max="100" step="any" value={p.hoursPerGroup} onChange={e=>setP({...p,hoursPerGroup:e.target.value===''?NaN:Number(e.target.value)})}/></label>
     <div className="full calculation-preview">Total requerido <strong>{fmt(p.groups*p.hoursPerGroup)} h pedagógicas</strong></div>
     <label className="full">Justificación<textarea required value={reason} onChange={e=>setReason(e.target.value)} placeholder="Describe el ajuste de este escenario"/></label>
     {error&&<p className="error-text full" role="alert">{error}</p>}
@@ -393,8 +393,8 @@ function EditSettings({settings,close,save}) {
   return <Dialog title="Parámetros del escenario" subtitle="Se aplican a los indicadores y a la cuadratura PIE de todos los establecimientos." close={close}><form onSubmit={submit}><div className="dialog-body form-grid">
     <label>Colación diaria (minutos)<input type="number" min="0" max="120" step="5" value={v.lunchMinutesPerDay} onChange={e=>f('lunchMinutesPerDay',e.target.value)}/></label>
     <label>Desde jornadas de (horas semanales)<input type="number" min="0" max="44" step="1" value={v.lunchFromHours} onChange={e=>f('lunchFromHours',e.target.value)}/></label>
-    <label>Apoyo PIE por curso con JEC (h)<input type="number" min="0" max="44" step="0.5" value={v.pieHoursJec} onChange={e=>f('pieHoursJec',e.target.value)}/></label>
-    <label>Apoyo PIE por curso sin JEC (h)<input type="number" min="0" max="44" step="0.5" value={v.pieHoursNoJec} onChange={e=>f('pieHoursNoJec',e.target.value)}/></label>
+    <label>Apoyo PIE por curso con JEC (h)<input type="number" min="0" max="44" step="any" value={v.pieHoursJec} onChange={e=>f('pieHoursJec',e.target.value)}/></label>
+    <label>Apoyo PIE por curso sin JEC (h)<input type="number" min="0" max="44" step="any" value={v.pieHoursNoJec} onChange={e=>f('pieHoursNoJec',e.target.value)}/></label>
     <p className="full field-help">Valores de escenario para la demostración. Deben validarse con la normativa vigente y los criterios del SLEP antes de usar datos reales.</p>
     <label className="full">Motivo del cambio<textarea required value={reason} onChange={e=>setReason(e.target.value)} placeholder="Ej.: ajuste de criterio PIE acordado con la UATP"/></label>
     {error&&<p className="error-text full" role="alert">{error}</p>}
