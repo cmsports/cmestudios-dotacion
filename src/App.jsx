@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { LayoutDashboard, School, UsersRound, BookOpen, UploadCloud, History, ChevronDown, ChevronUp, ArrowUpRight, ArrowRight, Search, Bell, Download, Plus, Check, X, CheckCircle2, AlertTriangle, Building2, SlidersHorizontal, FileSpreadsheet, FileText, Pencil, RotateCcw, ShieldCheck, CircleHelp, ArrowLeft, GraduationCap, Sprout, Layers, Clock3, Menu, BriefcaseBusiness, TrendingUp, Bot, Send, Minus, Maximize2, Minimize2, ArrowLeftRight } from 'lucide-react';
+import { LayoutDashboard, School, UsersRound, BookOpen, UploadCloud, History, ChevronDown, ChevronUp, ArrowUpRight, ArrowRight, Search, Bell, Download, Plus, Check, X, CheckCircle2, AlertTriangle, Building2, SlidersHorizontal, FileSpreadsheet, FileText, Pencil, RotateCcw, ShieldCheck, CircleHelp, ArrowLeft, GraduationCap, Sprout, Layers, Clock3, Menu, BriefcaseBusiness, TrendingUp, ArrowLeftRight } from 'lucide-react';
 import { MODALITIES, STORAGE_KEY, fmt, round, capacityPedagogical, teacherCheck, summarizeSchool, createSeed, serializeCSV, parseCSV, validateImport, applyImport, sampleImport, movableTeachers, suggestReassignments, applyReassignments } from './core.mjs';
 
 const NAV = [ ['overview', 'Vista general', LayoutDashboard], ['schools', 'Establecimientos', School], ['people', 'Dotación', UsersRound], ['plans', 'Planes y cuadratura', BookOpen], ['reassign', 'Reasignación', ArrowLeftRight], ['import', 'Importar datos', UploadCloud], ['history', 'Bitácora de cambios', History] ];
@@ -28,7 +28,6 @@ export default function App() {
   const [storageError, setStorageError] = useState(false);
   const [mobileNav, setMobileNav] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [chatOpen, setChatOpen] = useState(false);
   useEffect(() => { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); setStorageError(false); } catch { setStorageError(true); } }, [state]);
   useEffect(() => { if (!notice) return; const timer = setTimeout(() => setNotice(''), 5000); return () => clearTimeout(timer); }, [notice]);
   useEffect(() => { setPersonPage(1); }, [query, modality, personType, scope, selectedSchool]);
@@ -98,7 +97,7 @@ export default function App() {
       <div className="sidebar-user"><span className="avatar">CM</span><div>Equipo CMEstudios<small>Administrador · Demo local</small></div></div>
     </aside>
     <main>
-      <header className="topbar"><div className="breadcrumb"><button className="icon-btn mobile-only" aria-label="Abrir menú" onClick={()=>setMobileNav(!mobileNav)}><Menu size={20}/></button><span>Planificación</span><span>/</span><strong>{NAV.find(n=>n[0]===page)[1]}</strong></div><div className="topbar-right"><span className="local-dot">Demo local · datos ficticios</span><button className="icon-btn" aria-label="Asistente de dotación" onClick={()=>setChatOpen(true)}><Bot size={19}/></button><button className="icon-btn notification" aria-label="Ver alertas" onClick={()=>setModal({type:'alerts'})}><Bell size={19}/><i/></button><span className="top-avatar">CM</span></div></header>
+      <header className="topbar"><div className="breadcrumb"><button className="icon-btn mobile-only" aria-label="Abrir menú" onClick={()=>setMobileNav(!mobileNav)}><Menu size={20}/></button><span>Planificación</span><span>/</span><strong>{NAV.find(n=>n[0]===page)[1]}</strong></div><div className="topbar-right"><span className="local-dot">Demo local · datos ficticios</span><button className="icon-btn notification" aria-label="Ver alertas" onClick={()=>setModal({type:'alerts'})}><Bell size={19}/><i/></button><span className="top-avatar">CM</span></div></header>
       <div className="content">
         {storageError&&<div className="warning-banner"><AlertTriangle size={17}/>El navegador no pudo guardar los cambios. Exporta los datos antes de cerrar.</div>}
         <div className="page-heading"><div><div className="eyebrow">DOTACIÓN ESCOLAR / 2027</div><h1>{Titles[page][0]}</h1><p>{Titles[page][1]}</p></div><div className="heading-actions"><span className="period-pill"><span/>Año escolar 2027</span><select aria-label="Vista de demostración" value={scope} onChange={e=>{setScope(e.target.value);setQuery('');}}><option value="all">Sostenedor · vista demo</option><option value="school">Establecimiento · vista demo</option></select></div></div>
@@ -153,7 +152,6 @@ export default function App() {
     {modal?.type==='guide'&&<Dialog title="Un recorrido de 4 minutos" subtitle="Cinco capacidades exigidas para el Anexo 7" close={()=>setModal(null)}><div className="dialog-body guide-steps">{[['00:00','Vista general','Dashboard con docentes, asistentes y cobertura.'],['00:40','Importar datos','Carga CSV, validación y confirmación de cambios.'],['01:30','Modalidades','Escuela regular, TP, jardín VTF y microcentro.'],['02:20','Cuadratura','Edita un plan o una jornada y muestra el recálculo.'],['03:15','Cierre','Exporta un reporte y revisa la bitácora.']].map(([time,title,desc])=><div key={time}><span>{time}</span><section><h3>{title}</h3><p>{desc}</p></section></div>)}</div><div className="dialog-actions"><button className="primary-btn" onClick={()=>{setModal(null);changePage('overview');}}>Comenzar recorrido <ArrowRight size={16}/></button></div></Dialog>}
     {modal?.type==='alerts'&&<Dialog title="Alertas de planificación" subtitle="Resultados según parámetros del escenario" close={()=>setModal(null)}><div className="dialog-body"><div className="warning-banner"><AlertTriangle size={18}/>{deficits.length} unidades con déficit · {overloads} sobrecargas.</div>{scoped.filter(s=>s.status==='Déficit'||s.status==='Sobrecarga'||s.status==='Por validar').slice(0,12).map(s=><button className="alert-item" key={s.id} onClick={()=>{goPlan(s.id);setModal(null);}}><div><strong>{s.name}</strong><small>{s.modality==='Jardín VTF'?'Coeficientes VTF pendientes de validación':`${fmt(s.gap)} h pedagógicas de diferencia`}</small></div><Status value={s.status}/><ArrowUpRight size={16}/></button>)}</div></Dialog>}
     {modal?.type==='reset'&&<Dialog title="¿Restablecer el escenario?" subtitle="Se eliminarán ajustes, importaciones y bitácora de esta demo." close={()=>setModal(null)}><div className="dialog-body"><p>Los archivos que ya descargaste se conservan. Esta acción recupera los 2.200 registros ficticios iniciales.</p></div><div className="dialog-actions"><button className="secondary-btn" onClick={()=>setModal(null)}>Cancelar</button><button className="primary-btn" onClick={()=>{setState(createSeed());setModal(null);setNotice('Escenario inicial restablecido.');}}>Restablecer demo</button></div></Dialog>}
-    {chatOpen&&<ChatDrawer close={()=>setChatOpen(false)} scoped={scoped}/>}
   </div>;
 }
 
@@ -244,83 +242,4 @@ function ReassignPanel({stats,state,commit,notify,readOnly}) {
         <div className="full"><button className="primary-btn" disabled={readOnly} onClick={applyManual}>Mover docente <Check size={16}/></button></div>
       </div></section>
   </>;
-}
-
-function mdToHtml(text) {
-  const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  let html = esc(text);
-  html = html.replace(/^#{1,3} (.*)$/gm, '<strong class="chat-h">$1</strong>');
-  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-  html = html.replace(/(^|\n)((?:[-*] .*(?:\n|$))+)/g, (_, pre, block) => `${pre}<ul>${block.trim().split('\n').map(l => `<li>${l.replace(/^[-*] /, '')}</li>`).join('')}</ul>`);
-  html = html.split(/\n{2,}/).map(p => p.includes('<ul>') || p.includes('chat-h') ? p : `<p>${p}</p>`).join('');
-  return html.replace(/\n/g, '<br/>');
-}
-
-function ChatDrawer({ close, scoped }) {
-  const [messages, setMessages] = useState([{ role: 'assistant', text: 'Hola, soy el asistente de dotación. Pregúntame, por ejemplo: "¿qué establecimientos tienen déficit?" o "resume las sobrecargas".' }]);
-  const [input, setInput] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-  const [minimized, setMinimized] = useState(false);
-  const [big, setBig] = useState(false);
-  const [pos, setPos] = useState(null);
-  const listRef = useRef();
-  const panelRef = useRef();
-  const dragRef = useRef(null);
-  useEffect(() => { listRef.current?.scrollTo({ top: listRef.current.scrollHeight }); }, [messages, busy]);
-  useEffect(() => () => { window.removeEventListener('mousemove', onDragMove); window.removeEventListener('mouseup', onDragEnd); }, []);
-  const context = scoped.map(s => ({ nombre: s.name, modalidad: s.modality, estado: s.status, requeridas: s.required, asignadas: s.assigned, brecha: s.gap, sobrecargas: s.overloads }));
-  const onDragMove = e => {
-    const d = dragRef.current; if (!d) return;
-    const w = panelRef.current.offsetWidth, h = panelRef.current.offsetHeight;
-    const x = Math.min(Math.max(8, d.origX + (e.clientX - d.startX)), window.innerWidth - w - 8);
-    const y = Math.min(Math.max(8, d.origY + (e.clientY - d.startY)), window.innerHeight - h - 8);
-    setPos({ x, y });
-  };
-  const onDragEnd = () => { dragRef.current = null; window.removeEventListener('mousemove', onDragMove); window.removeEventListener('mouseup', onDragEnd); };
-  const onDragStart = e => {
-    if (e.target.closest('button')) return;
-    const rect = panelRef.current.getBoundingClientRect();
-    dragRef.current = { startX: e.clientX, startY: e.clientY, origX: rect.left, origY: rect.top };
-    window.addEventListener('mousemove', onDragMove);
-    window.addEventListener('mouseup', onDragEnd);
-  };
-  const send = async e => {
-    e.preventDefault();
-    const text = input.trim();
-    if (!text || busy) return;
-    setMessages(m => [...m, { role: 'user', text }]);
-    setInput(''); setBusy(true); setError('');
-    try {
-      const res = await fetch('/api/dotacion-chat', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ message: text, context }) });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Error del servidor');
-      setMessages(m => [...m, { role: 'assistant', text: data.reply }]);
-    } catch (err) {
-      setError('No se pudo contactar al asistente. ¿Está configurada la API key en el servidor?');
-    } finally { setBusy(false); }
-  };
-  const style = pos ? { left: pos.x, top: pos.y, right: 'auto', bottom: 'auto' } : undefined;
-  return <aside className={`chat-drawer ${big ? 'big' : ''} ${minimized ? 'minimized' : ''}`} style={style} ref={panelRef}>
-    <header onMouseDown={onDragStart}>
-      <div className="icon-surface"><Bot size={18}/></div>
-      <div><h2>Asistente de dotación</h2>{!minimized && <p>Claude Haiku · analiza el escenario visible</p>}</div>
-      <div className="chat-controls">
-        <button className="icon-btn" aria-label={minimized ? 'Restaurar' : 'Minimizar'} onClick={()=>setMinimized(m=>!m)}>{minimized ? <ChevronUp size={16}/> : <Minus size={16}/>}</button>
-        <button className="icon-btn" aria-label={big ? 'Reducir' : 'Agrandar'} onClick={()=>setBig(b=>!b)} disabled={minimized}>{big ? <Minimize2 size={15}/> : <Maximize2 size={15}/>}</button>
-        <button className="icon-btn" aria-label="Cerrar asistente" onClick={close}><X size={18}/></button>
-      </div>
-    </header>
-    {!minimized && <>
-      <div className="chat-messages" ref={listRef}>
-        {messages.map((m, i) => m.role === 'assistant' ? <div key={i} className="chat-bubble assistant" dangerouslySetInnerHTML={{ __html: mdToHtml(m.text) }}/> : <div key={i} className="chat-bubble user">{m.text}</div>)}
-        {busy && <div className="chat-bubble assistant chat-typing">Pensando…</div>}
-      </div>
-      {error && <div className="warning-banner chat-error"><AlertTriangle size={16}/>{error}</div>}
-      <form className="chat-input" onSubmit={send}>
-        <input aria-label="Pregúntale al asistente" placeholder="Pregunta sobre déficits, excedentes, sobrecargas…" value={input} onChange={e=>setInput(e.target.value)} disabled={busy}/>
-        <button className="primary-btn" type="submit" disabled={busy || !input.trim()} aria-label="Enviar"><Send size={16}/></button>
-      </form>
-    </>}
-  </aside>;
 }
