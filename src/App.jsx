@@ -39,9 +39,12 @@ function modalityCopy(school) {
 }
 function saveDownload(name, content, type = 'text/csv;charset=utf-8') { const a = document.createElement('a'); const url = URL.createObjectURL(new Blob([content], {type})); a.href = url; a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); }
 function Dialog({ title, subtitle, children, close, wide = false }) {
-  const ref = useRef(); const previous = useRef(document.activeElement);
+  const ref = useRef(); const previous = useRef(document.activeElement); const pressedOutside = useRef(false);
   useEffect(() => { const el = ref.current; el.showModal(); return () => { if (el.open) el.close(); previous.current?.focus?.(); }; }, []);
-  return <dialog ref={ref} className={`dialog ${wide ? 'wide' : ''}`} onCancel={e => {e.preventDefault();close();}} onClick={e => {if(e.target === ref.current)close();}}><header><div><h2>{title}</h2>{subtitle && <p>{subtitle}</p>}</div><button className="icon-btn" aria-label="Cerrar" onClick={close}><X size={20}/></button></header>{children}</dialog>;
+  // Solo cierra con un clic que empieza y termina en el fondo oscuro: arrastrar una selección o usar la barra
+  // de scroll del formulario no debe cerrar la ventana ni perder lo escrito.
+  const outside = e => { const r = ref.current.getBoundingClientRect(); return e.target === ref.current && (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom); };
+  return <dialog ref={ref} className={`dialog ${wide ? 'wide' : ''}`} onCancel={e => {e.preventDefault();close();}} onMouseDown={e => { pressedOutside.current = outside(e); }} onClick={e => { if (pressedOutside.current && outside(e)) close(); pressedOutside.current = false; }}><header><div><h2>{title}</h2>{subtitle && <p>{subtitle}</p>}</div><button className="icon-btn" aria-label="Cerrar" onClick={close}><X size={20}/></button></header>{children}</dialog>;
 }
 
 export default function App() {
@@ -328,7 +331,7 @@ function EditPerson({person,isNew,schools,close,save,download,busy}) {
     <label>Financiamiento<select value={p.funding} onChange={e=>field('funding',e.target.value)}>{FUNDING.map(v=><option key={v}>{v}</option>)}</select></label>
     {!p.vacant&&<label className="full">Fuero<select value={hasFuero(p)?'Fuero gremial':''} onChange={e=>field('protection',e.target.value)}><option value="">Sin fuero</option><option>Fuero gremial</option></select></label>}
     <p className="form-section full">Proyección 2027</p>
-    <label className={needsHours?'':'full'}>Proyección<select value={p.projection} onChange={e=>field('projection',e.target.value)}>{PROJECTIONS.map(v=><option key={v} disabled={v==='No renovación'&&(p.vacant||!RENEWABLE.includes(p.contract))}>{v}</option>)}</select></label>
+    <label className={needsHours?'':'full'}>Proyección<select value={p.projection} onChange={e=>field('projection',e.target.value)}>{PROJECTIONS.map(v=><option key={v} disabled={v==='No renovación'&&(p.vacant||!RENEWABLE.includes(p.contract))}>{v}</option>)}</select>{!p.vacant&&!RENEWABLE.includes(p.contract)&&<small>"No renovación" solo aplica a contratos a plazo fijo o contrata.</small>}</label>
     {needsHours&&<label>{p.projection==='Aumento'?'Horas a aumentar (60 min)':'Horas a suprimir (60 min)'}<input type="number" min="0.5" max="44" step="any" required value={Number.isFinite(p.changeHours)&&p.changeHours>0?p.changeHours:''} onChange={e=>field('changeHours',number(e.target.value))}/></label>}
     {risky&&<div className="full warning-banner"><Scale size={17}/>Persona con fuero gremial: una disminución o no renovación requiere revisión jurídica antes de aplicarse.</div>}
     <label className="full">Justificación del cambio<textarea required value={p.justification} onChange={e=>field('justification',e.target.value)} placeholder={p.vacant?'Ej.: cubrir el déficit de Matemática en 7° y 8° básico':'Ej.: ajuste de escenario por cambio de matrícula'}/></label>
