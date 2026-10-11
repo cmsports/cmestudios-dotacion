@@ -2,12 +2,12 @@
 // No toca el DOM: recibe jsPDF / XLSX ya cargados y devuelve el documento, para poder probarlo fuera del navegador.
 import { fmt, round, capacityPedagogical, teacherCheck, teacherFunction, assistantCategory, summarizeSchool, summarizeTracks, summarizeRural, summarizePie, vtfLevelsOf, indicatorRows, TP_TRACKS, TEACHER_FUNCTIONS, FULL_TIME, MODALITIES } from './core.mjs';
 
-export const BRAND = [81, 67, 233];
+export const BRAND = [27, 95, 191];
 export const hasFuero = p => /fuero/i.test(p.protection || '');
 const DISCLAIMER = 'DEMOSTRACION - Datos ficticios. Formato propio; pendiente adaptar a la planilla PAL de la DEP.';
-const pdfFooter = pdf => { pdf.setFontSize(8); pdf.setTextColor(120); pdf.text('CMEstudios | Escenario demo | ' + new Date().toLocaleDateString('es-CL'), 14, pdf.internal.pageSize.height - 8); pdf.setTextColor(0); };
+export const pdfFooter = pdf => { pdf.setFontSize(8); pdf.setTextColor(120); pdf.text('CMEstudios | Escenario demo | ' + new Date().toLocaleDateString('es-CL'), 14, pdf.internal.pageSize.height - 8); pdf.setTextColor(0); };
 // Agrega una tabla con título, pasando de página si no queda espacio.
-function pdfSection(pdf, autoTable, { title, head, body }, fontSize = 8) {
+export function pdfSection(pdf, autoTable, { title, head, body }, fontSize = 8) {
   let y = (pdf.lastAutoTable?.finalY ?? 30) + 10;
   if (y > pdf.internal.pageSize.height - 35) { pdf.addPage(); y = 20; }
   pdf.setFontSize(11); pdf.text(title, 14, y);
@@ -76,7 +76,7 @@ const cellOf = (v, z) => v === null || v === undefined || v === '' ? null : type
 const yes = b => b ? 'Sí' : 'No';
 
 // columns: { key, label, width, value(row), formula?(row, at), total?, z? }. at(key) = celda de esa columna en la fila.
-function tableSheet({ title, note, columns, rows, totals = true }) {
+export function tableSheet({ title, note, columns, rows, totals = true }) {
   const ws = {}; const last = FIRST - 1 + rows.length;
   put(ws, 0, 0, { t: 's', v: title }); if (note) put(ws, 1, 0, { t: 's', v: note });
   columns.forEach((c, i) => put(ws, FIRST - 2, i, { t: 's', v: c.label }));
@@ -100,7 +100,7 @@ function tableSheet({ title, note, columns, rows, totals = true }) {
 const letter = (columns, key) => colName(columns.findIndex(c => c.key === key));
 const dataRange = (sheet, columns, key, rows) => `${q(sheet)}!$${letter(columns, key)}$${FIRST}:$${letter(columns, key)}$${FIRST - 1 + Math.max(rows, 1)}`;
 const wholeCol = (sheet, columns, key) => `${q(sheet)}!$${letter(columns, key)}:$${letter(columns, key)}`;
-function notesSheet(lines) {
+export function notesSheet(lines) {
   const ws = {}; const all = ['Cómo usar esta planilla', '', ...lines, '', 'Datos ficticios de demostración. Formato propio; pendiente adaptar a la planilla PAL de la DEP.'];
   all.forEach((t, r) => put(ws, r, 0, cellOf(t)));
   ws['!ref'] = `A1:A${all.length}`; ws['!cols'] = [{ wch: 130 }]; return ws;
@@ -151,8 +151,10 @@ function peopleColumns(byId) {
     { key: 'hm', label: 'Horas media (60 min)', width: 11, z: HOURS, total: true, value: p => p.hoursMedia },
     { key: 'lect', label: 'Lectivas asignadas (45 min)', width: 13, z: HOURS, total: true, value: p => isTeacher(p) ? p.assignedPed : null },
     { key: 'ratio', label: 'Proporción lectiva', width: 11, z: PCT, value: p => isTeacher(p) ? sch(p)?.lectiveRatio : null },
+    { key: 'xsid', label: 'Establecimiento extra (ID)', width: 11, value: p => p.extraPed > 0 ? p.extraSchool : null },
+    { key: 'xped', label: 'Lectivas en establecimiento extra (45 min)', width: 14, z: HOURS, total: true, value: p => p.extraPed > 0 ? p.extraPed : null },
     { key: 'cap', label: 'Capacidad lectiva (45 min)', width: 13, z: HOURS, total: true, value: p => isTeacher(p) ? capacityPedagogical(p.contractHours, sch(p)?.lectiveRatio) : null, formula: (p, at) => isTeacher(p) ? `ROUND(${at('h')}*${at('ratio')}*60/45,2)` : null },
-    { key: 'slack', label: 'Holgura (45 min; negativo = sobrecarga)', width: 15, z: HOURS, total: true, value: p => isTeacher(p) ? round(capacityPedagogical(p.contractHours, sch(p)?.lectiveRatio) - p.assignedPed) : null, formula: (p, at) => isTeacher(p) ? `${at('cap')}-${at('lect')}` : null },
+    { key: 'slack', label: 'Holgura (45 min; negativo = sobrecarga)', width: 15, z: HOURS, total: true, value: p => isTeacher(p) ? round(capacityPedagogical(p.contractHours, sch(p)?.lectiveRatio) - p.assignedPed - (p.extraPed || 0)) : null, formula: (p, at) => isTeacher(p) ? `${at('cap')}-${at('lect')}-${at('xped')}` : null },
     { key: 'funding', label: 'Financiamiento', width: 12, value: p => p.funding },
     { key: 'track', label: 'Formación TP', width: 22, value: p => p.track },
     { key: 'rural', label: 'Escuela rural', width: 24, value: p => p.ruralSchool },
@@ -285,8 +287,8 @@ export function indicatorsBook(ind, XLSX, { state, label, ids }) {
   const R = 'Resumen PAL', PS = 'Personal', E = 'Establecimientos', M = 'Por modalidad';
   const S = { lunchMin: `${q(R)}!$B$6`, lunchFrom: `${q(R)}!$B$7`, pieJec: `${q(R)}!$B$8`, pieNoJec: `${q(R)}!$B$9` };
   const classroom = p => p.type === 'Docente' && byId.get(p.schoolId).modality !== 'Jardín VTF';
-  const kind = (p, fn) => { if (!classroom(p)) return 0; const aula = round(Math.min(p.contractHours, p.assignedPed * 45 / 60)); return fn === 'aula' ? aula : teacherFunction(p.role) === fn ? round(p.contractHours - aula) : 0; };
-  const typeFormula = fn => (p, at) => `IF(AND(${at('type')}="Docente",${at('mode')}<>"Jardín VTF"${fn ? `,${at('fn')}="${fn}"` : ''}),${fn ? `${at('h')}-${at('aula')}` : `ROUND(MIN(${at('h')},${at('lect')}*45/60),2)`},0)`;
+  const kind = (p, fn) => { if (!classroom(p)) return 0; const aula = round(Math.min(p.contractHours, (p.assignedPed + (p.extraPed || 0)) * 45 / 60)); return fn === 'aula' ? aula : teacherFunction(p.role) === fn ? round(p.contractHours - aula) : 0; };
+  const typeFormula = fn => (p, at) => `IF(AND(${at('type')}="Docente",${at('mode')}<>"Jardín VTF"${fn ? `,${at('fn')}="${fn}"` : ''}),${fn ? `${at('h')}-${at('aula')}` : `ROUND(MIN(${at('h')},(${at('lect')}+${at('xped')})*45/60),2)`},0)`;
   const pCols = [...peopleColumns(byId),
     { key: 'aula', label: 'Lectivas en aula (60 min)', width: 13, z: HOURS, value: p => kind(p, 'aula'), formula: typeFormula(null) },
     { key: 'nl', label: 'Curriculares no lectivas (60 min)', width: 14, z: HOURS, value: p => kind(p, 'Docente de aula'), formula: typeFormula('Docente de aula') },
@@ -302,7 +304,7 @@ export function indicatorsBook(ind, XLSX, { state, label, ids }) {
     { key: 'id', label: 'ID', width: 9, value: s => s.id }, { key: 'name', label: 'Establecimiento', width: 32, value: s => s.name }, { key: 'mode', label: 'Modalidad', width: 20, value: s => s.modality }, { key: 'commune', label: 'Comuna', width: 14, value: s => s.commune },
     { key: 'jec', label: 'JEC', width: 6, value: s => s.modality === 'Jardín VTF' ? '' : yes(s.jec) },
     { key: 'req', label: 'Horas requeridas (45 min)', width: 13, z: HOURS, total: true, value: s => s.modality === 'Jardín VTF' ? null : sumOf(s).required },
-    { key: 'asg', label: 'Horas asignadas (45 min)', width: 13, z: HOURS, total: true, value: s => s.modality === 'Jardín VTF' ? null : sumOf(s).assigned, formula: (s, at) => s.modality === 'Jardín VTF' ? null : `SUMIFS(${col('lect')},${col('sid')},${at('id')},${col('type')},"Docente")` },
+    { key: 'asg', label: 'Horas asignadas (45 min)', width: 13, z: HOURS, total: true, value: s => s.modality === 'Jardín VTF' ? null : sumOf(s).assigned, formula: (s, at) => s.modality === 'Jardín VTF' ? null : `SUMIFS(${col('lect')},${col('sid')},${at('id')},${col('type')},"Docente")+SUMIFS(${col('xped')},${col('xsid')},${at('id')})` },
     { key: 'gap', label: 'Brecha (45 min)', width: 12, z: HOURS, total: true, value: s => s.modality === 'Jardín VTF' ? null : sumOf(s).gap, formula: (s, at) => s.modality === 'Jardín VTF' ? null : `${at('asg')}-${at('req')}` },
     { key: 'th', label: 'Horas docentes (60 min)', width: 13, z: HOURS, total: true, value: s => sumWhere(staff, p => p.schoolId === s.id && p.type === 'Docente' && !p.vacant ? p.contractHours : 0), formula: (s, at) => `SUMIFS(${col('h')},${col('sid')},${at('id')},${col('type')},"Docente",${live})` },
     { key: 'ah', label: 'Horas asistentes (60 min)', width: 13, z: HOURS, total: true, value: s => sumWhere(staff, p => p.schoolId === s.id && p.type === 'Asistente' && !p.vacant ? p.contractHours : 0), formula: (s, at) => `SUMIFS(${col('h')},${col('sid')},${at('id')},${col('type')},"Asistente",${live})` },

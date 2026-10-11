@@ -37,7 +37,8 @@ export function capacityPedagogical(contractHours, ratio = 0.65) {
 export function teacherCheck(person, school) {
   const ratio = school?.lectiveRatio ?? 0.65;
   const capacity = capacityPedagogical(person.contractHours, ratio);
-  return { capacity, assigned: person.assignedPed, excess: round(Math.max(0, person.assignedPed - capacity)), lectiveClock: round(person.contractHours * ratio), nonLectiveClock: round(person.contractHours * (1 - ratio)) };
+  const assigned = round(person.assignedPed + (person.extraPed || 0));
+  return { capacity, assigned, excess: round(Math.max(0, assigned - capacity)), lectiveClock: round(person.contractHours * ratio), nonLectiveClock: round(person.contractHours * (1 - ratio)) };
 }
 
 export function teacherFunction(role = '') {
@@ -56,7 +57,7 @@ export function assistantCategory(role = '') {
 // el resto del contrato es directivo, técnico-pedagógico o curricular no lectivo según la función.
 export function hourBreakdown(person) {
   const total = person.contractHours;
-  const aula = round(Math.min(total, person.assignedPed * 45 / 60));
+  const aula = round(Math.min(total, (person.assignedPed + (person.extraPed || 0)) * 45 / 60));
   const rest = round(total - aula);
   const fn = teacherFunction(person.role);
   return { aula, noLectivas: fn === 'Docente de aula' ? rest : 0, directivas: fn === 'Directiva' ? rest : 0, tecnicas: fn === 'Técnico-pedagógica' ? rest : 0 };
@@ -75,7 +76,10 @@ export function summarizeSchool(school, staff, plans) {
   const vacancies = people.filter(p => p.vacant);
   const required = plans.filter(p => p.schoolId === school.id).reduce((s, p) => s + p.groups * p.hoursPerGroup, 0);
   const lecturers = people.filter(p => p.type === 'Docente');
-  const assigned = sum(lecturers, p => p.assignedPed);
+  // Docentes de otro colegio que hacen clases aquí (colegio extra).
+  const visiting = staff.filter(p => p.extraSchool === school.id && p.type === 'Docente' && p.extraPed > 0);
+  const visitingPed = round(sum(visiting, p => p.extraPed));
+  const assigned = sum(lecturers, p => p.assignedPed) + visitingPed;
   const vacantPed = round(sum(vacancies.filter(p => p.type === 'Docente'), p => p.assignedPed));
   const capacity = sum(lecturers, p => capacityPedagogical(p.contractHours, school.lectiveRatio));
   const gap = round(assigned - required);
@@ -90,7 +94,7 @@ export function summarizeSchool(school, staff, plans) {
   const enrollment = vtf ? sum(vtfLevelsOf(school), l => l.enrollment) : school.enrollment;
   const deficit = vtf ? vtfConfigured && (educators < needEducators || technicians < needTechnicians) : gap < -0.01;
   const status = vtf && !vtfConfigured ? 'Por validar' : overloads ? 'Sobrecarga' : deficit ? 'Déficit' : !vtf && gap > 0.01 ? 'Excedente' : 'Equilibrado';
-  return { ...school, enrollment, teachers: teachers.length, assistants: assistants.length, people: persons.length, vacancies: vacancies.length, vacantPed, required, assigned: round(assigned), capacity: round(capacity), gap, overloads, status, educators, technicians, needEducators, needTechnicians, vtfConfigured, contractHours: sum(persons, p => p.contractHours) };
+  return { ...school, enrollment, teachers: teachers.length, assistants: assistants.length, people: persons.length, vacancies: vacancies.length, vacantPed, visiting: visiting.length, visitingPed, required, assigned: round(assigned), capacity: round(capacity), gap, overloads, status, educators, technicians, needEducators, needTechnicians, vtfConfigured, contractHours: sum(persons, p => p.contractHours) };
 }
 
 // Liceos TP: formación general y diferenciada se cuadran por separado.
@@ -294,7 +298,7 @@ export function createSeed() {
       if (isTeacher && school.modality === 'Técnico profesional') person.track = k % 5 < 2 ? 'Formación diferenciada TP' : 'Formación general';
       if (school.modality === 'Microcentro') person.ruralSchool = school.ruralMembers[k % school.ruralMembers.length].name;
       const media = ['Liceo', 'Técnico profesional'].includes(school.modality);
-      Object.assign(person, { rut: formatRut(45000000 + i * 37 + 11), statute: vtf ? 'Código del Trabajo' : isTeacher ? 'Estatuto Docente' : 'Ley 21.109', startDate: `${2001 + (i * 7) % 25}-${String(i % 12 + 1).padStart(2, '0')}-01`, endDate: contract === 'Plazo fijo' ? (i % 4 ? '2026-12-31' : '2027-02-28') : '' });
+      Object.assign(person, { rut: formatRut(45000000 + i * 37 + 11), statute: vtf ? 'Código del Trabajo' : isTeacher ? 'Estatuto Docente' : 'Ley 21.109', startDate: `${2001 + (i * 7) % 25}-${String(i % 12 + 1).padStart(2, '0')}-01`, endDate: contract === 'Plazo fijo' ? ['2027-02-28', '2027-07-31', '2027-12-31', '2027-12-31'][(i >> 1) % 4] : '' });
       if (isTeacher && !vtf) Object.assign(person, { tramo: TRAMOS[(i * 3) % 5], hoursBasic: media ? 0 : contractHours, hoursMedia: media ? contractHours : 0 });
       staff.push(person);
     }
