@@ -46,14 +46,16 @@ Los módulos en este entorno se reutilizan mediante un enlace a las dependencias
 ## Funciona
 
 - 52 establecimientos ficticios (25 escuelas regulares, 11 liceos —4 TP—, 2 escuelas especiales, 14 jardines VTF) y 4 microcentros que agrupan 25 escuelas rurales ficticias.
-- 1.100 docentes y 1.100 asistentes ficticios. Se usan IDs DEMO, no RUT reales.
-- Dashboard calculado a partir de la dotación, filtros por modalidad y vista simulada de establecimiento.
-- Importación CSV: separador coma/punto y coma, BOM, comillas, validación integral, vista previa y actualización por ID. No borra personas ausentes del archivo.
-- Edición de establecimiento, proporción lectiva, proyección y justificación; edición de jornadas y planes; recálculo de brechas y alertas de sobrecarga.
-- Jardines VTF con parámetros de coeficientes explícitos y cálculo de puestos requeridos, redondeados hacia arriba. Sin valores legales precargados.
-- Planes separados para TP, escuela especial y microcentros.
-- Exportación CSV, Excel XLSX y PDF, ficha individual en PDF y bitácora exportable.
+- 1.100 docentes y 1.100 asistentes ficticios, repartidos según el tamaño de cada modalidad, más cargos vacantes de ejemplo. Se usan IDs DEMO, no RUT reales.
+- Menú en el orden de trabajo: datos (importar, establecimientos, dotación), análisis (cuadratura, indicadores PAL) y registro (bitácora). La vista general muestra los cuatro pasos.
+- Indicadores PAL (Producto 4 de las bases): horas docentes vigentes, asistentes en personas y jornadas, educadoras y técnicas VTF, horas a suprimir, contratos no renovados, cargos vacantes, fuero gremial, tipos de hora (lectivas, no lectivas, directivas, técnico-pedagógicas), fuentes (general, SEP/PME, PIE, VTF), colación, horas por modalidad y por establecimiento, docentes por función, asistentes por categoría y PIE con NEE transitorias y permanentes. Cada tarjeta abre la lista de personas que la compone.
+- Cuadratura por modalidad: liceos TP por formación general y diferenciada con especialidades; microcentros por escuela rural y cursos combinados; jardines VTF por nivel con coeficientes de escenario (opción de aplicarlos a todos los jardines); PIE con horas de apoyo por curso con o sin JEC.
+- Cargos vacantes: se crean desde un déficit, entran a la cuadratura, a los indicadores y a la bitácora.
+- Proyección por persona con horas de aumento o supresión; la no renovación solo se permite en plazo fijo o contrata, y el fuero gremial muestra una advertencia.
+- Importación CSV masiva (archivo de ejemplo con más de 200 filas en todas las modalidades), con columnas opcionales `fuero`, `formacion_tp` y `escuela_rural`, validación integral, vista previa y actualización por ID.
+- Exportaciones: un solo menú "Exportar" por pantalla. Los Excel llevan fórmulas vivas (capacidad, holgura, brechas, totales con SUBTOTAL que respetan filtros, resumen PAL calculado desde la hoja de personal con supuestos editables) y una hoja de notas. Ficha por establecimiento en PDF con espacio para firma del director y en Excel de trabajo. Carga horaria individual en PDF.
 - Persistencia en localStorage del navegador y reinicio del escenario desde Bitácora.
+- `ABRIR_DEMO.html` es la misma demo en un solo archivo, para abrir sin servidor (el asistente con IA no funciona ahí).
 
 ## Reglas y límites
 
@@ -87,12 +89,14 @@ npm run build
 
 Las pruebas de lógica verifican cobertura, conversión de unidades, recálculo de brechas, parámetros VTF y CSV. Se incluye `tests/browser.cjs`, usado en este entorno con Playwright y Chromium para probar los recorridos, descargas, persistencia y vista móvil; sus rutas de navegador son específicas del entorno.
 
-## Recorrido sugerido para video (4 minutos)
+## Recorrido sugerido para video (4 minutos y medio)
 
-1. 00:00–00:40: dashboard y cobertura; declarar que se muestran datos ficticios.
-2. 00:40–01:30: Importar datos → Probar archivo de ejemplo → revisar → confirmar.
-3. 01:30–02:20: mostrar planes de una escuela, un liceo TP, un jardín VTF y un microcentro.
-4. 02:20–03:15: modificar horas de un plan o jornada con justificación y mostrar recálculo.
-5. 03:15–04:00: exportar reporte y revisar bitácora.
+Sigue los cinco parámetros que puntúa la comisión (bases, punto 10.2.2). Antes de grabar: Bitácora → Restablecer demo.
+
+1. 00:00–00:45 · Plataforma 52 + 4: Establecimientos; declarar que los datos son ficticios.
+2. 00:45–01:40 · Carga masiva: Importar datos → Usar el archivo de ejemplo → revisar → Confirmar.
+3. 01:40–02:50 · Módulos por modalidad: abrir la cuadratura de una escuela (PIE), un liceo TP (formación general y diferenciada), un jardín VTF (configurar coeficientes) y un microcentro (escuelas rurales).
+4. 02:50–03:40 · Cuadratura: editar una asignatura, ver el recálculo, crear un cargo vacante y exportar la ficha para firma.
+5. 03:40–04:30 · Dashboard: Indicadores PAL, abrir una tarjeta (por ejemplo cargos vacantes) y exportar el Excel con fórmulas.
 
 El guion es preparatorio. Grabar y presentar únicamente las capacidades reales, sin atribuir validación normativa o funcionalidades de producción a la demo.
